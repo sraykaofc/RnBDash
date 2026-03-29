@@ -1285,6 +1285,32 @@ function App() {
                       {activeFilter === 'loaWOLevel' && '🤝 LOA-WO Level'}
                       {activeFilter === 'highPriority' && '🎯 High Priority Routes'}
                     </CardTitle>
+                    {/* Red Alerts Breakdown (BE, TS, DTP, Tender, LOA, WO) */}
+                    {activeFilter === 'redAlerts' && (
+                      <div className="flex gap-2 flex-wrap">
+                        {(() => {
+                          const breakdown = {
+                            BE: filteredList.filter(p => p.alertType === 'Stuck at Govt - BE').length,
+                            TS: filteredList.filter(p => p.alertType === 'Stuck at Govt - TS').length,
+                            DTP: filteredList.filter(p => p.alertType === 'Stuck at Govt - DTP').length,
+                            Proposal: filteredList.filter(p => p.alertType === 'Stuck at Govt - Proposal').length,
+                            Tender: filteredList.filter(p => p.alertType === 'Bid Validity Crossed' || p.alertType === 'Bid Validity Expiring' || p.alertType === 'Tender Opening Missed').length,
+                            LOA: filteredList.filter(p => p.alertType === 'LOA Pending').length,
+                            WO: filteredList.filter(p => p.alertType === 'WO Pending').length
+                          };
+                          return (
+                            <>
+                              <Badge variant="outline" className="bg-red-50">BE: {breakdown.BE}</Badge>
+                              <Badge variant="outline" className="bg-orange-50">TS: {breakdown.TS}</Badge>
+                              <Badge variant="outline" className="bg-yellow-50">DTP: {breakdown.DTP}</Badge>
+                              <Badge variant="outline" className="bg-purple-50">Tender: {breakdown.Tender + breakdown.Proposal}</Badge>
+                              <Badge variant="outline" className="bg-blue-50">LOA: {breakdown.LOA}</Badge>
+                              <Badge variant="outline" className="bg-green-50">WO: {breakdown.WO}</Badge>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                     {/* D/C/G Breakdown for Pending AA, TS, DTP, Tender Approvals */}
                     {(activeFilter === 'pendingAA' || activeFilter === 'pendingTS' || activeFilter === 'pendingDTP' || activeFilter === 'tenderApprovals') && (
                       <div className="flex gap-2">
