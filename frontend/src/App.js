@@ -476,10 +476,10 @@ function App() {
         }
         
         // 2. Stuck at Govt Alert - Based on previous stage completion date
-        // BE Status = G (waiting for AA approval) - use PAA Date (Column I)
+        // BE Status = G (waiting for AA approval) - use PAA Date (Column I) - >30 days
         if (beStatus === 'G' && paaDate) {
           const daysStuck = differenceInDays(new Date(), paaDate);
-          if (daysStuck > 15) {
+          if (daysStuck > 30) {
             redAlerts.push({ 
               ...project, 
               alertType: 'Stuck at Govt - BE',
@@ -491,10 +491,10 @@ function App() {
           }
         }
         
-        // TS Status = G (waiting for TS approval) - use AA Date (Column L)
+        // TS Status = G (waiting for TS approval) - use AA Date (Column L) - >30 days
         if (tsStatus === 'G' && aaDate) {
           const daysStuck = differenceInDays(new Date(), aaDate);
-          if (daysStuck > 15) {
+          if (daysStuck > 30) {
             redAlerts.push({ 
               ...project, 
               alertType: 'Stuck at Govt - TS',
@@ -506,10 +506,10 @@ function App() {
           }
         }
         
-        // DTP Status = G (waiting for DTP approval) - use TS Date (Column O)
+        // DTP Status = G (waiting for DTP approval) - use TS Date (Column O) - >30 days
         if (dtpStatus === 'G' && tsDate) {
           const daysStuck = differenceInDays(new Date(), tsDate);
-          if (daysStuck > 15) {
+          if (daysStuck > 30) {
             redAlerts.push({ 
               ...project, 
               alertType: 'Stuck at Govt - DTP',
@@ -521,14 +521,14 @@ function App() {
           }
         }
         
-        // Proposal Status = G (waiting for tender approval) - use DTP Date or Opened Date
+        // Proposal Status = G (waiting for tender approval) - use DTP Date or Opened Date - >60 days
         if (proposalStatus === 'G') {
           const dtpApprovalDate = parseDate(project['DTP Date']);
           const referenceDate = dtpApprovalDate || openedDate;
           
           if (referenceDate) {
             const daysStuck = differenceInDays(new Date(), referenceDate);
-            if (daysStuck > 15) {
+            if (daysStuck > 60) {
               redAlerts.push({ 
                 ...project, 
                 alertType: 'Stuck at Govt - Proposal',
