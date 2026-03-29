@@ -353,15 +353,15 @@ function App() {
         'PAA Amount': normalized['PAA Amount'] || normalized['PAA (Rs. Lakh)'] || normalized['Column H'] || normalized['H'] || '',
         'PAA Date': normalized['PAA Date'] || normalized['Column I'] || normalized['I'] || '',
         'BE Status': normalized['BE Status'] || normalized['Column J'] || normalized['J'] || '',
-        'BE G Date': normalized['BE G Date'] || normalized['Column K'] || normalized['K'] || '', // Tracking date when sent to G
+        'Column K': normalized['Column K'] || normalized['K'] || '', // Dual purpose: Date (when J='G') or Amount (when J='AA')
         'AA Amount': normalized['AA Amount'] || normalized['AA (Rs. Lakh)'] || normalized['Column K'] || normalized['K'] || '',
         'AA Date': normalized['AA Date'] || normalized['Column L'] || normalized['L'] || '',
         'TS Status': normalized['TS Status'] || normalized['Column M'] || normalized['M'] || '',
-        'TS G Date': normalized['TS G Date'] || normalized['Column N'] || normalized['N'] || '', // Tracking date when sent to G
+        'Column N': normalized['Column N'] || normalized['N'] || '', // Dual purpose: Date (when M='G') or Amount (when M='TS')
         'TS Amount': normalized['TS Amount'] || normalized['TS (Rs. Lakh)'] || normalized['Column N'] || normalized['N'] || '',
         'TS Date': normalized['TS Date'] || normalized['Column O'] || normalized['O'] || '',
         'DTP Status': normalized['DTP Status'] || normalized['Column P'] || normalized['P'] || '',
-        'DTP G Date': normalized['DTP G Date'] || normalized['Column Q'] || normalized['Q'] || '', // Tracking date when sent to G
+        'Column Q': normalized['Column Q'] || normalized['Q'] || '', // Dual purpose: Date (when P='G') or Amount (when P='DTP')
         'DTP Amount': normalized['DTP Amount'] || normalized['DTP (Rs. Lakh)'] || normalized['Column Q'] || normalized['Q'] || '',
         'DTP Date': normalized['DTP Date'] || normalized['Column R'] || normalized['R'] || '',
         'Closing Date': normalized['Closing Date'] || normalized['Column S'] || normalized['S'] || '',
@@ -369,7 +369,7 @@ function App() {
         'Agency Name': normalized['Agency Name'] || normalized['Column U'] || normalized['U'] || '',
         '% of Tender': normalized['% of Tender'] || normalized['Column V'] || normalized['V'] || '',
         'Proposal Status': normalized['Proposal Status'] || normalized['Column W'] || normalized['W'] || '',
-        'Proposal G Date': normalized['Proposal G Date'] || normalized['Column X'] || normalized['X'] || '', // Tracking date when sent to G
+        'Column X': normalized['Column X'] || normalized['X'] || '', // Dual purpose: Date (when W='G') or Amount (when W='TA')
         'Approved Amount': normalized['Approved Amount'] || normalized['Column X'] || normalized['X'] || '',
         'App. Date': normalized['App. Date'] || normalized['Approval Date'] || normalized['Column Y'] || normalized['Y'] || '',
         'LOA Date': normalized['LOA Date'] || normalized['Column Z'] || normalized['Z'] || '',
@@ -447,17 +447,43 @@ function App() {
       // Get Column AC status early - needed for all alerts
       const acStatus = project['Column AC']?.trim().toLowerCase() || '';
       
-      // Get G tracking dates
-      const beGDate = parseDate(project['BE G Date']);
-      const tsGDate = parseDate(project['TS G Date']);
-      const dtpGDate = parseDate(project['DTP G Date']);
-      const proposalGDate = parseDate(project['Proposal G Date']);
+      // Get G tracking dates - ONLY parse as date when status is 'G'
+      // These columns serve dual purpose: Date when status='G', Amount when status='AA'/'TS'/'DTP'/'TA'
+      const beGDate = beStatus === 'G' ? parseDate(project['Column K']) : null;
+      const tsGDate = tsStatus === 'G' ? parseDate(project['Column N']) : null;
+      const dtpGDate = dtpStatus === 'G' ? parseDate(project['Column Q']) : null;
+      const proposalGDate = proposalStatus === 'G' ? parseDate(project['Column X']) : null;
       
       // === RED ALERTS SECTION ===
       // IMPORTANT: All alerts require Column AC = "Not Started"
       
       if (acStatus === 'not started') {
-        // 1. Stuck at Govt Alert - Check columns J, M, P, W for status 'G'
+        // 1. Bid Validity Alert - Enhanced with P=DTP requirement
+        if (dtpStatus === 'DTP' && closingDate) {
+          const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
+          
+          // Bid Validity CROSSED (already expired) - TOP PRIORITY
+          if (daysRemaining <= 0) {
+            const daysCrossed = Math.abs(daysRemaining);
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Bid Validity Crossed',
+              alertPriority: 0.5, // Higher than expiring
+              daysCrossed
+            });
+          }
+          // Bid Validity EXPIRING (< 30 days remaining)
+          else if (daysRemaining < 30) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Bid Validity Expiring',
+              alertPriority: 1,
+              daysRemaining 
+            });
+          }
+        }
+        
+        // 2. Stuck at Govt Alert - Check columns J, M, P, W for status 'G'
         // BE Status = G (Column J), tracking date in Column K
         if (beStatus === 'G') {
           if (beGDate) {
@@ -554,7 +580,7 @@ function App() {
           }
         }
         
-        // 2. Tender Alert - If P=DTP, W=D, and Closing Date (S) crossed >15 days
+        // 3. Tender Alert - If P=DTP, W=D, and Closing Date (S) crossed >15 days
         if (dtpStatus === 'DTP' && proposalStatus === 'D' && closingDate) {
           const daysMissed = differenceInDays(new Date(), closingDate);
           if (daysMissed > 15) {
@@ -563,19 +589,6 @@ function App() {
               alertType: 'Tender Opening Missed',
               alertPriority: 3,
               daysMissed
-            });
-          }
-        }
-        
-        // 3. Bid Validity Alert - Enhanced with P=DTP requirement
-        if (dtpStatus === 'DTP' && closingDate) {
-          const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
-          if (daysRemaining < 30 && daysRemaining > 0) {
-            redAlerts.push({ 
-              ...project, 
-              alertType: 'Bid Validity Expiring',
-              alertPriority: 1,
-              daysRemaining 
             });
           }
         }
@@ -652,6 +665,7 @@ function App() {
     });
     
     // Sort Red Alerts by priority:
+    // 0.5. Bid Validity Crossed (MOST URGENT - already expired)
     // 1. Bid Validity Expiring
     // 2. Stuck at Govt (BE, TS, DTP, Proposal)
     // 3. Tender Opening Missed
@@ -661,7 +675,10 @@ function App() {
       if (a.alertPriority !== b.alertPriority) {
         return a.alertPriority - b.alertPriority;
       }
-      // If same priority, sort by days (descending - most urgent first)
+      // If same priority, sort by urgency
+      if (a.daysCrossed !== undefined && b.daysCrossed !== undefined) {
+        return b.daysCrossed - a.daysCrossed; // Higher crossed days = more urgent
+      }
       if (a.daysRemaining !== undefined && b.daysRemaining !== undefined) {
         return a.daysRemaining - b.daysRemaining; // Lower remaining days = more urgent
       }
@@ -1481,6 +1498,20 @@ function ProjectRow({ project, onClick, showAlert }) {
           </Badge>
         )}
         
+        {/* Bid Validity Crossed Alert (Expired) */}
+        {showAlert && project.alertType === 'Bid Validity Crossed' && (
+          <Badge variant="destructive" className="text-xs font-bold">
+            🚨 Bid Validity Crossed by {project.daysCrossed} days
+          </Badge>
+        )}
+        
+        {/* Bid Validity Expiring Alert */}
+        {showAlert && project.alertType === 'Bid Validity Expiring' && (
+          <Badge variant="destructive" className="text-xs">
+            ⏰ Bid Validity: {project.daysRemaining} days left
+          </Badge>
+        )}
+        
         {/* Stuck at Govt Alerts */}
         {showAlert && project.alertType?.includes('Stuck at Govt') && (
           <Badge variant="destructive" className="text-xs">
@@ -1495,13 +1526,6 @@ function ProjectRow({ project, onClick, showAlert }) {
         {showAlert && project.alertType === 'Tender Opening Missed' && (
           <Badge variant="destructive" className="text-xs">
             📢 Tender Opening Missed by {project.daysMissed} days
-          </Badge>
-        )}
-        
-        {/* Bid Validity Alert */}
-        {showAlert && project.alertType === 'Bid Validity Expiring' && (
-          <Badge variant="destructive" className="text-xs">
-            ⏰ Bid Validity: {project.daysRemaining} days left
           </Badge>
         )}
         
