@@ -118,6 +118,7 @@ function App() {
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDataTable, setShowDataTable] = useState(false);
+  const [selectedDivisions, setSelectedDivisions] = useState([]);
   
   // Parse CSV data
   const handleFileUpload = (event) => {
@@ -302,6 +303,24 @@ function App() {
     setProjects(processed);
   };
   
+  // Get available divisions
+  const availableDivisions = useMemo(() => {
+    const divisions = new Set();
+    projects.forEach(project => {
+      const division = project['Division']?.trim();
+      if (division) divisions.add(division);
+    });
+    return Array.from(divisions).sort();
+  }, [projects]);
+  
+  // Filter projects by selected divisions
+  const filteredProjects = useMemo(() => {
+    if (selectedDivisions.length === 0) return projects;
+    return projects.filter(project => 
+      selectedDivisions.includes(project['Division']?.trim())
+    );
+  }, [projects, selectedDivisions]);
+  
   // Calculate metrics
   const metrics = useMemo(() => {
     const redAlerts = [];
@@ -310,7 +329,7 @@ function App() {
     const executionPhase = [];
     const highPriority = [];
     
-    projects.forEach(project => {
+    filteredProjects.forEach(project => {
       const closingDate = parseDate(project['Closing Date']);
       const dispatchDate = parseDate(project['Dispatch Date']);
       const beStatus = project['BE Status']?.trim();
@@ -357,7 +376,39 @@ function App() {
     });
     
     return { redAlerts, pendingAA, pendingApprovals, executionPhase, highPriority };
-  }, [projects]);
+  }, [filteredProjects]);
+  
+  // Get status distribution from Column AC
+  const statusDistribution = useMemo(() => {
+    const distribution = {
+      'Not Started': 0,
+      'In Progress': 0,
+      'Phy. Completed': 0,
+      'Completed': 0,
+      'Stopped': 0
+    };
+    
+    filteredProjects.forEach(project => {
+      const status = project['Column AC']?.trim().toLowerCase() || '';
+      
+      if (status.includes('not started') || status === '') {
+        distribution['Not Started']++;
+      } else if (status.includes('progress') || status.includes('%')) {
+        distribution['In Progress']++;
+      } else if (status.includes('phy') && status.includes('complet')) {
+        distribution['Phy. Completed']++;
+      } else if (status.includes('completed') || status.includes('complete')) {
+        distribution['Completed']++;
+      } else if (status.includes('stop')) {
+        distribution['Stopped']++;
+      } else {
+        // Default to In Progress for other statuses
+        distribution['In Progress']++;
+      }
+    });
+    
+    return distribution;
+  }, [filteredProjects]);
   
   // Get breakdown by D/C/G
   const getBreakdown = (list) => {
@@ -394,13 +445,13 @@ function App() {
   
   // Search filtered projects
   const searchedProjects = useMemo(() => {
-    if (!searchQuery) return projects;
-    return projects.filter(project => 
+    if (!searchQuery) return filteredProjects;
+    return filteredProjects.filter(project => 
       Object.values(project).some(value => 
         String(value).toLowerCase().includes(searchQuery.toLowerCase())
       )
     );
-  }, [projects, searchQuery]);
+  }, [filteredProjects, searchQuery]);
   
   // Render project details
   if (selectedProject) {
@@ -584,6 +635,51 @@ function App() {
           </Card>
         )}
         
+        {/* Division Filter */}
+        {projects.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium whitespace-nowrap">Filter by Division:</label>
+                <div className="flex flex-wrap gap-2 flex-1">
+                  {availableDivisions.map(division => (
+                    <Button
+                      key={division}
+                      variant={selectedDivisions.includes(division) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedDivisions(prev => 
+                          prev.includes(division)
+                            ? prev.filter(d => d !== division)
+                            : [...prev, division]
+                        );
+                      }}
+                      className="text-xs"
+                    >
+                      {division}
+                    </Button>
+                  ))}
+                  {selectedDivisions.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedDivisions([])}
+                      className="text-xs text-slate-500"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+                {selectedDivisions.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {selectedDivisions.length} selected
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
         {/* Stats Cards */}
         {projects.length > 0 && (
           <>
@@ -718,26 +814,34 @@ function App() {
               </Button>
             </div>
             
-            {/* Pipeline Distribution Chart */}
+            {/* Project Status Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Pipeline Distribution</CardTitle>
+                <CardTitle>Project Status Distribution</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={[
-                    { name: 'Division', count: getBreakdown(metrics.pendingApprovals).D },
-                    { name: 'Circle', count: getBreakdown(metrics.pendingApprovals).C },
-                    { name: 'Government', count: getBreakdown(metrics.pendingApprovals).G }
+                    { name: 'Not Started', count: statusDistribution['Not Started'], fill: '#94a3b8' },
+                    { name: 'In Progress', count: statusDistribution['In Progress'], fill: '#3b82f6' },
+                    { name: 'Phy. Completed', count: statusDistribution['Phy. Completed'], fill: '#f59e0b' },
+                    { name: 'Completed', count: statusDistribution['Completed'], fill: '#10b981' },
+                    { name: 'Stopped', count: statusDistribution['Stopped'], fill: '#ef4444' }
                   ]}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
+                    <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} fontSize={12} />
                     <YAxis />
                     <Tooltip />
                     <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                      <Cell fill="#3b82f6" />
-                      <Cell fill="#10b981" />
-                      <Cell fill="#8b5cf6" />
+                      {[
+                        { fill: '#94a3b8' },
+                        { fill: '#3b82f6' },
+                        { fill: '#f59e0b' },
+                        { fill: '#10b981' },
+                        { fill: '#ef4444' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
