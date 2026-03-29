@@ -421,13 +421,17 @@ function App() {
         pendingAA.push(project);
       }
       
-      // Pending TS - has AA but no TS
-      if (aaDate && !tsDate && ['D', 'C', 'G'].includes(tsStatus)) {
+      // Pending TS - has AA but TS not approved yet
+      // TS is approved when TS Status = 'TS' OR has TS Date
+      const hasTS = tsStatus === 'TS' || tsDate;
+      if (aaDate && !hasTS) {
         pendingTS.push(project);
       }
       
-      // Pending DTP - has TS but no DTP
-      if (tsDate && !dtpDate && ['D', 'C', 'G'].includes(dtpStatus)) {
+      // Pending DTP - has TS but DTP not approved yet
+      // DTP is approved when DTP Status = 'DTP' OR has DTP Date
+      const hasDTP = dtpStatus === 'DTP' || dtpDate;
+      if (hasTS && !hasDTP) {
         pendingDTP.push(project);
       }
       
