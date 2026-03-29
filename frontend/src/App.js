@@ -297,7 +297,7 @@ function App() {
         normalized[trimmedKey] = typeof row[key] === 'string' ? row[key].trim() : row[key];
       });
       
-      return {
+      const result = {
         id: index,
         'Work Name': normalized['Work Name'] || normalized['Name'] || normalized['A'] || '',
         'Division': normalized['Division'] || normalized['Dist'] || '',
@@ -329,6 +329,14 @@ function App() {
         'Route Type': normalized['Route Type'] || '',
         ...normalized
       };
+      
+      // Debug: Log if PAA Amount is missing
+      if (!result['PAA Amount'] && index < 5) {
+        console.log(`Row ${index} - Missing PAA Amount. Available keys:`, Object.keys(normalized));
+        console.log(`Row ${index} - Checking: H='${normalized['H']}', Column H='${normalized['Column H']}', PAA Amount='${normalized['PAA Amount']}'`);
+      }
+      
+      return result;
     });
     
     setProjects(processed);
@@ -482,20 +490,24 @@ function App() {
     };
     
     filteredProjects.forEach(project => {
-      const status = project['Column AC']?.trim().toLowerCase() || '';
+      const status = project['Column AC']?.trim() || '';
+      const statusLower = status.toLowerCase();
       
-      if (status.includes('not started') || status === '') {
-        distribution['Not Started']++;
-      } else if (status.includes('progress') || status.includes('%')) {
-        distribution['In Progress']++;
-      } else if (status.includes('phy') && status.includes('complet')) {
-        distribution['Phy. Completed']++;
-      } else if (status.includes('completed') || status.includes('complete')) {
+      // Check exact matches first, then partial matches
+      if (statusLower === 'completed' || statusLower === 'complete') {
         distribution['Completed']++;
-      } else if (status.includes('stop')) {
+      } else if (statusLower === 'phy. completed' || statusLower === 'physically completed' || 
+                 (statusLower.includes('phy') && statusLower.includes('complet'))) {
+        distribution['Phy. Completed']++;
+      } else if (statusLower === 'in progress' || statusLower.includes('progress') || 
+                 statusLower.includes('%') || statusLower.includes('working')) {
+        distribution['In Progress']++;
+      } else if (statusLower === 'stopped' || statusLower === 'stop') {
         distribution['Stopped']++;
+      } else if (statusLower === 'not started' || statusLower === '' || statusLower === 'pending') {
+        distribution['Not Started']++;
       } else {
-        // Default to In Progress for other statuses
+        // Default to In Progress for any other status with content
         distribution['In Progress']++;
       }
     });
@@ -1040,11 +1052,6 @@ function ProjectRow({ project, onClick, showAlert }) {
   const currentStatus = calculateCurrentStatus(project);
   const beStatus = project['BE Status']?.trim();
   
-  let amountDisplay = paaAmount;
-  if (paaAmount && !String(paaAmount).toLowerCase().includes('lakh')) {
-    amountDisplay = `${paaAmount} Lakh`;
-  }
-  
   return (
     <div 
       onClick={onClick}
@@ -1058,7 +1065,7 @@ function ProjectRow({ project, onClick, showAlert }) {
       
       {(paaAmount || paaDate) && (
         <div className="text-xs font-bold text-slate-500 mb-1">
-          PAA: {amountDisplay || 'N/A'} Dt: {formatDate(paaDate)}
+          PAA: {paaAmount || 'N/A'} Dt: {formatDate(paaDate)}
         </div>
       )}
       
