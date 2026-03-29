@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import './App.css';
@@ -956,7 +956,7 @@ function App() {
                 <CardTitle>Project Status Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={[
                     { name: 'Not Started', count: statusDistribution['Not Started'], fill: '#94a3b8' },
                     { name: 'In Progress', count: statusDistribution['In Progress'], fill: '#3b82f6' },
@@ -969,6 +969,11 @@ function App() {
                     <YAxis />
                     <Tooltip />
                     <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                      <LabelList 
+                        dataKey="count" 
+                        position="top" 
+                        style={{ fontSize: '14px', fontWeight: 'bold', fill: '#1e293b' }}
+                      />
                       {[
                         { fill: '#94a3b8' },
                         { fill: '#3b82f6' },
@@ -981,6 +986,17 @@ function App() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                <div className="mt-4 pt-4 border-t text-center">
+                  <p className="text-lg font-bold text-slate-700">
+                    Total Projects: {
+                      statusDistribution['Not Started'] + 
+                      statusDistribution['In Progress'] + 
+                      statusDistribution['Phy. Completed'] + 
+                      statusDistribution['Completed'] + 
+                      statusDistribution['Stopped']
+                    }
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </>
@@ -1019,9 +1035,9 @@ function ProjectRow({ project, onClick, showAlert }) {
         </div>
       </div>
       
-      {paaAmount && (
+      {(paaAmount || paaDate) && (
         <div className="text-xs font-bold text-slate-500 mb-1">
-          PAA: {amountDisplay} Dt: {formatDate(paaDate)}
+          PAA: {amountDisplay || 'N/A'} Dt: {formatDate(paaDate)}
         </div>
       )}
       
@@ -1037,6 +1053,7 @@ function ProjectRow({ project, onClick, showAlert }) {
             {beStatus === 'D' && 'Division'}
             {beStatus === 'C' && 'Circle'}
             {beStatus === 'G' && 'Government'}
+            {beStatus === 'AA' && 'AA Done'}
           </Badge>
         )}
         
