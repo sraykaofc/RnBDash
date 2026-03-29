@@ -2,13 +2,15 @@ import { useState, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake } from 'lucide-react';
+import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake, Filter, Columns } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import './App.css';
 
@@ -157,6 +159,9 @@ function App() {
   const [showDataTable, setShowDataTable] = useState(false);
   const [selectedDivisions, setSelectedDivisions] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [visibleColumns, setVisibleColumns] = useState(['Code', 'Work Name', 'Division', 'PAA Amount', 'PAA Date', 'Status']);
+  const [columnFilters, setColumnFilters] = useState({});
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
   
   // Auto-load predefined Google Sheet on initial page load
   useEffect(() => {
@@ -342,8 +347,9 @@ function App() {
       
       const result = {
         id: index,
-        'Work Name': normalized['Work Name'] || normalized['Name'] || normalized['A'] || '',
-        'Division': normalized['Division'] || normalized['Dist'] || '',
+        'Code': normalized['Code'] || normalized['Column B'] || normalized['B'] || '',
+        'Work Name': normalized['Work Name'] || normalized['Name'] || normalized['Column E'] || normalized['E'] || '',
+        'Division': normalized['Division'] || normalized['Dist'] || normalized['Column C'] || normalized['C'] || '',
         'PAA Amount': normalized['PAA Amount'] || normalized['PAA (Rs. Lakh)'] || normalized['Column H'] || normalized['H'] || '',
         'PAA Date': normalized['PAA Date'] || normalized['Column I'] || normalized['I'] || '',
         'BE Status': normalized['BE Status'] || normalized['Column J'] || normalized['J'] || '',
@@ -731,11 +737,53 @@ function App() {
   
   // Render full data table view
   if (showDataTable) {
+    // Available columns for selection - ALL columns from the data
+    const allColumns = [
+      { key: 'Code', label: 'Code' },
+      { key: 'Work Name', label: 'Work Name' },
+      { key: 'Division', label: 'Division' },
+      { key: 'PAA Amount', label: 'PAA Amount' },
+      { key: 'PAA Date', label: 'PAA Date' },
+      { key: 'Status', label: 'Status (Column AC)' },
+      { key: 'BE Status', label: 'BE Status' },
+      { key: 'AA Amount', label: 'AA Amount' },
+      { key: 'AA Date', label: 'AA Date' },
+      { key: 'TS Status', label: 'TS Status' },
+      { key: 'TS Amount', label: 'TS Amount' },
+      { key: 'TS Date', label: 'TS Date' },
+      { key: 'DTP Status', label: 'DTP Status' },
+      { key: 'DTP Amount', label: 'DTP Amount' },
+      { key: 'DTP Date', label: 'DTP Date' },
+      { key: 'Closing Date', label: 'Closing Date' },
+      { key: 'Opened Date', label: 'Opened Date' },
+      { key: 'Agency Name', label: 'Agency Name' },
+      { key: '% of Tender', label: '% of Tender' },
+      { key: 'Proposal Status', label: 'Proposal Status' },
+      { key: 'Approved Amount', label: 'Approved Amount' },
+      { key: 'App. Date', label: 'App. Date' },
+      { key: 'LOA Date', label: 'LOA Date' },
+      { key: 'WO Date', label: 'WO Date' },
+      { key: 'Year', label: 'Year' },
+      { key: 'Time', label: 'Time' },
+      { key: 'Amount Category', label: 'Amount Category' },
+      { key: 'Year YYYY', label: 'Year YYYY' },
+      { key: 'Route Type', label: 'Route Type' }
+    ];
+    
+    // Apply column filters
+    const filteredByColumns = searchedProjects.filter(project => {
+      return Object.entries(columnFilters).every(([column, filterValue]) => {
+        if (!filterValue) return true;
+        const projectValue = String(project[column] || '').toLowerCase();
+        return projectValue.includes(filterValue.toLowerCase());
+      });
+    });
+    
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <Toaster position="top-right" />
         <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4 gap-2">
             <Button
               variant="outline"
               onClick={() => setShowDataTable(false)}
@@ -743,12 +791,50 @@ function App() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
             </Button>
-            <Input
-              placeholder="Search all data..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
+            
+            <div className="flex gap-2 flex-1 max-w-2xl">
+              <Input
+                placeholder="Search all data..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+              
+              <Popover open={showColumnSelector} onOpenChange={setShowColumnSelector}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline">
+                    <Columns className="w-4 h-4 mr-2" />
+                    Columns
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm mb-2">Show Columns</h4>
+                    {allColumns.map(col => (
+                      <div key={col.key} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={col.key}
+                          checked={visibleColumns.includes(col.key)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setVisibleColumns([...visibleColumns, col.key]);
+                            } else {
+                              setVisibleColumns(visibleColumns.filter(c => c !== col.key));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={col.key}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {col.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           
           <Card>
@@ -757,29 +843,51 @@ function App() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 border-b">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium">Work Name</th>
-                      <th className="px-4 py-3 text-left font-medium">Division</th>
-                      <th className="px-4 py-3 text-left font-medium">PAA Amount</th>
-                      <th className="px-4 py-3 text-left font-medium">PAA Date</th>
-                      <th className="px-4 py-3 text-left font-medium">Status</th>
-                      <th className="px-4 py-3 text-left font-medium">BE Status</th>
+                      {allColumns.map(col => {
+                        if (!visibleColumns.includes(col.key)) return null;
+                        return (
+                          <th key={col.key} className="px-4 py-3 text-left">
+                            <div className="space-y-1">
+                              <div className="font-medium">{col.label}</div>
+                              <Input
+                                placeholder="Filter..."
+                                value={columnFilters[col.key] || ''}
+                                onChange={(e) => setColumnFilters({...columnFilters, [col.key]: e.target.value})}
+                                className="h-7 text-xs"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {searchedProjects.map((project) => (
+                    {filteredByColumns.map((project) => (
                       <tr 
                         key={project.id} 
                         className="border-b hover:bg-slate-50 cursor-pointer"
                         onClick={() => setSelectedProject(project)}
                       >
-                        <td className="px-4 py-3">{project['Work Name']}</td>
-                        <td className="px-4 py-3">{project['Division']}</td>
-                        <td className="px-4 py-3">{project['PAA Amount']}</td>
-                        <td className="px-4 py-3">{formatDate(parseDate(project['PAA Date']))}</td>
-                        <td className="px-4 py-3">{calculateCurrentStatus(project)}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline">{project['BE Status']}</Badge>
-                        </td>
+                        {allColumns.map(col => {
+                          if (!visibleColumns.includes(col.key)) return null;
+                          
+                          // Special handling for date columns
+                          const dateColumns = ['PAA Date', 'AA Date', 'TS Date', 'DTP Date', 'Closing Date', 'Opened Date', 'App. Date', 'LOA Date', 'WO Date'];
+                          const isDateColumn = dateColumns.includes(col.key);
+                          
+                          // Special handling for Status column (maps to Column AC)
+                          let value = project[col.key];
+                          if (col.key === 'Status') {
+                            value = project['Column AC'];
+                          }
+                          
+                          return (
+                            <td key={col.key} className="px-4 py-3">
+                              {isDateColumn ? formatDate(parseDate(value)) : (value || 'N/A')}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
