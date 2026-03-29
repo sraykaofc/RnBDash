@@ -459,7 +459,10 @@ function App() {
       
       if (acStatus === 'not started') {
         // 1. Bid Validity Alert - Enhanced with P=DTP requirement
-        if (dtpStatus === 'DTP' && closingDate) {
+        // Don't show bid validity alerts when tender is approved (W='TA' and Y has date)
+        const tenderApproved = proposalStatus === 'TA' && appDate;
+        
+        if (dtpStatus === 'DTP' && closingDate && !tenderApproved) {
           const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
           
           // Bid Validity CROSSED (already expired) - TOP PRIORITY
