@@ -138,32 +138,131 @@ function App() {
   };
   
   // Import from Google Sheets
-  const handleGoogleSheetImport = () => {
+  const handleGoogleSheetImport = async () => {
     if (!googleSheetUrl) {
       toast.error('Please enter a Google Sheet URL');
       return;
     }
     
-    // Convert to CSV export URL
-    let csvUrl = googleSheetUrl;
-    if (googleSheetUrl.includes('/edit')) {
-      csvUrl = googleSheetUrl.replace('/edit', '/export?format=csv');
-    } else if (!googleSheetUrl.includes('/export')) {
-      csvUrl = `${googleSheetUrl}/export?format=csv`;
-    }
+    // Extract spreadsheet ID from URL
+    let spreadsheetId = '';
+    let gid = '0'; // default to first sheet
     
-    Papa.parse(csvUrl, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        processData(results.data);
-        toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
-      },
-      error: (error) => {
-        toast.error(`Error importing from Google Sheets: ${error.message}`);
+    try {
+      // Handle different Google Sheets URL formats
+      const urlPatterns = [
+        /\/d\/([a-zA-Z0-9-_]+)/,
+        /spreadsheets\/d\/([a-zA-Z0-9-_]+)/,
+        /key=([a-zA-Z0-9-_]+)/
+      ];
+      
+      for (const pattern of urlPatterns) {
+        const match = googleSheetUrl.match(pattern);
+        if (match) {
+          spreadsheetId = match[1];
+          break;
+        }
       }
-    });
+      
+      // Try to extract gid (sheet ID) if present
+      const gidMatch = googleSheetUrl.match(/[#&]gid=([0-9]+)/);
+      if (gidMatch) {
+        gid = gidMatch[1];
+      }
+      
+      if (!spreadsheetId) {
+        toast.error('Invalid Google Sheets URL. Please check the URL and try again.');
+        return;
+      }
+      
+      // Construct CSV export URL
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
+      
+      toast.loading('Importing from Google Sheets...');
+      
+      // Try direct fetch first
+      try {
+        const response = await fetch(csvUrl, {
+          method: 'GET',
+          mode: 'cors',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const csvText = await response.text();
+        
+        // Parse CSV
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            if (results.data && results.data.length > 0) {
+              processData(results.data);
+              toast.dismiss();
+              toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
+            } else {
+              toast.dismiss();
+              toast.error('No data found in the sheet. Please check if the sheet has data.');
+            }
+          },
+          error: (error) => {
+            toast.dismiss();
+            toast.error(`Error parsing CSV: ${error.message}`);
+          }
+        });
+        
+      } catch (directError) {
+        // If direct fetch fails due to CORS, try with CORS proxy
+        console.log('Direct fetch failed, trying CORS proxy...', directError);
+        
+        const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(csvUrl)}`;
+        
+        try {
+          const proxyResponse = await fetch(corsProxyUrl);
+          
+          if (!proxyResponse.ok) {
+            throw new Error('Failed to fetch through proxy');
+          }
+          
+          const csvText = await proxyResponse.text();
+          
+          // Parse CSV
+          Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              if (results.data && results.data.length > 0) {
+                processData(results.data);
+                toast.dismiss();
+                toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
+              } else {
+                toast.dismiss();
+                toast.error('No data found in the sheet.');
+              }
+            },
+            error: (error) => {
+              toast.dismiss();
+              toast.error(`Error parsing CSV: ${error.message}`);
+            }
+          });
+          
+        } catch (proxyError) {
+          console.error('Proxy fetch also failed:', proxyError);
+          toast.dismiss();
+          toast.error(
+            'Unable to import from Google Sheets. Please ensure the sheet is shared as "Anyone with the link" and try again, or download the CSV and upload it directly.',
+            { duration: 6000 }
+          );
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error importing from Google Sheets:', error);
+      toast.dismiss();
+      toast.error('Failed to import. Please check the URL or try downloading the CSV and uploading it.');
+    }
   };
   
   // Process and normalize data
@@ -468,7 +567,18 @@ function App() {
                     Import Data
                   </Button>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Make sure the sheet is shared with "Anyone with the link"</p>
+                <Alert className="mt-3 bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-xs text-slate-700">
+                    <strong>How to share your Google Sheet:</strong>
+                    <ol className="list-decimal ml-4 mt-1 space-y-1">
+                      <li>Open your Google Sheet</li>
+                      <li>Click the <strong>Share</strong> button (top right)</li>
+                      <li>Under "General access", select <strong>"Anyone with the link"</strong></li>
+                      <li>Set permission to <strong>"Viewer"</strong></li>
+                      <li>Click <strong>Done</strong>, then copy and paste the URL here</li>
+                    </ol>
+                  </AlertDescription>
+                </Alert>
               </div>
             </CardContent>
           </Card>
