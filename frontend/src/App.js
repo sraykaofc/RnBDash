@@ -310,7 +310,16 @@ function App() {
       const division = project['Division']?.trim();
       if (division) divisions.add(division);
     });
-    return Array.from(divisions).sort();
+    
+    // Sort divisions, but put "Circle" at the end if it exists
+    const sorted = Array.from(divisions).sort();
+    const circleIndex = sorted.findIndex(d => d.toLowerCase() === 'circle');
+    if (circleIndex !== -1) {
+      const circle = sorted.splice(circleIndex, 1)[0];
+      sorted.push(circle);
+    }
+    
+    return sorted;
   }, [projects]);
   
   // Filter projects by selected divisions
@@ -648,10 +657,9 @@ function App() {
                       variant={selectedDivisions.includes(division) ? "default" : "outline"}
                       size="sm"
                       onClick={() => {
+                        // Single selection - toggle current division
                         setSelectedDivisions(prev => 
-                          prev.includes(division)
-                            ? prev.filter(d => d !== division)
-                            : [...prev, division]
+                          prev.includes(division) ? [] : [division]
                         );
                       }}
                       className="text-xs"
@@ -666,13 +674,13 @@ function App() {
                       onClick={() => setSelectedDivisions([])}
                       className="text-xs text-slate-500"
                     >
-                      Clear All
+                      Clear Filter
                     </Button>
                   )}
                 </div>
                 {selectedDivisions.length > 0 && (
                   <Badge variant="secondary" className="ml-auto">
-                    {selectedDivisions.length} selected
+                    Filtered: {selectedDivisions[0]}
                   </Badge>
                 )}
               </div>
