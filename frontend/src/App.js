@@ -415,7 +415,6 @@ function App() {
     const tenderLevel = [];
     const tenderApprovals = [];
     const loaWOLevel = [];
-    const executionPhase = [];
     const highPriority = [];
     
     filteredProjects.forEach(project => {
@@ -483,20 +482,16 @@ function App() {
         tenderLevel.push(project);
       }
       
-      // Tender Approvals - Column P = "DTP" AND Column W = D/C/G AND S,T,U,V not blank
+      // Tender Approvals - Column P = "DTP" AND Column W = D/C/G AND ALL S,T,U,V have data
+      const percentTender = project['% of Tender']?.trim();
       if (dtpStatus === 'DTP' && ['D', 'C', 'G'].includes(proposalStatus) && 
-          (closingDate || openedDate || agencyName || project['% of Tender'])) {
+          closingDate && openedDate && agencyName && percentTender) {
         tenderApprovals.push(project);
       }
       
       // LOA-WO Level - Column AC = "Not Started" AND Column W = "TA"
       if (acStatus === 'not started' && proposalStatus === 'TA') {
         loaWOLevel.push(project);
-      }
-      
-      // Execution Phase - has WO
-      if (woDate) {
-        executionPhase.push(project);
       }
       
       // High Priority
@@ -513,7 +508,6 @@ function App() {
       tenderLevel, 
       tenderApprovals, 
       loaWOLevel, 
-      executionPhase, 
       highPriority 
     };
   }, [filteredProjects]);
@@ -666,7 +660,6 @@ function App() {
         if (loaDateA && !loaDateB) return 1;  // A is WO, B is LOA
         return 0;
       });
-      case 'executionPhase': return metrics.executionPhase;
       case 'highPriority': return metrics.highPriority;
       default: return [];
     }
@@ -1018,21 +1011,6 @@ function App() {
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card 
-                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'executionPhase' ? 'ring-2 ring-green-500' : ''}`}
-                onClick={() => setActiveFilter(activeFilter === 'executionPhase' ? null : 'executionPhase')}
-              >
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">Execution Phase</p>
-                      <p className="text-3xl font-bold text-green-600 mt-2">{metrics.executionPhase.length}</p>
-                    </div>
-                    <Building2 className="w-8 h-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
             </div>
             
             {/* Active Filter List */}
@@ -1048,7 +1026,6 @@ function App() {
                       {activeFilter === 'tenderLevel' && '📢 Tender Level Works'}
                       {activeFilter === 'tenderApprovals' && '✅ Tender Approvals'}
                       {activeFilter === 'loaWOLevel' && '🤝 LOA-WO Level'}
-                      {activeFilter === 'executionPhase' && '🚧 Execution Phase'}
                       {activeFilter === 'highPriority' && '🎯 High Priority Routes'}
                     </CardTitle>
                     {/* D/C/G Breakdown for Pending AA, TS, DTP, Tender Approvals */}
