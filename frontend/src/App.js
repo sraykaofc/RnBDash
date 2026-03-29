@@ -449,10 +449,23 @@ function App() {
       
       // Get G tracking dates - ONLY parse as date when status is 'G'
       // These columns serve dual purpose: Date when status='G', Amount when status='AA'/'TS'/'DTP'/'TA'
-      const beGDate = beStatus === 'G' ? parseDate(project['Column K']) : null;
-      const tsGDate = tsStatus === 'G' ? parseDate(project['Column N']) : null;
-      const dtpGDate = dtpStatus === 'G' ? parseDate(project['Column Q']) : null;
-      const proposalGDate = proposalStatus === 'G' ? parseDate(project['Column X']) : null;
+      // Enhanced parsing for better date detection
+      const parseGovtDate = (value) => {
+        if (!value) return null;
+        const strValue = String(value).trim();
+        if (!strValue) return null;
+        
+        // If it's a pure number (amount), skip parsing
+        if (/^\d+(\.\d+)?$/.test(strValue)) return null;
+        
+        // Try parsing as date (handles DD.MM.YYYY and other formats)
+        return parseDate(strValue);
+      };
+      
+      const beGDate = beStatus === 'G' ? parseGovtDate(project['Column K']) : null;
+      const tsGDate = tsStatus === 'G' ? parseGovtDate(project['Column N']) : null;
+      const dtpGDate = dtpStatus === 'G' ? parseGovtDate(project['Column Q']) : null;
+      const proposalGDate = proposalStatus === 'G' ? parseGovtDate(project['Column X']) : null;
       
       // === RED ALERTS SECTION ===
       // IMPORTANT: All alerts require Column AC = "Not Started"
