@@ -353,15 +353,12 @@ function App() {
         'PAA Amount': normalized['PAA Amount'] || normalized['PAA (Rs. Lakh)'] || normalized['Column H'] || normalized['H'] || '',
         'PAA Date': normalized['PAA Date'] || normalized['Column I'] || normalized['I'] || '',
         'BE Status': normalized['BE Status'] || normalized['Column J'] || normalized['J'] || '',
-        'Column K': normalized['Column K'] || normalized['K'] || '', // Dual purpose: Date (when J='G') or Amount (when J='AA')
         'AA Amount': normalized['AA Amount'] || normalized['AA (Rs. Lakh)'] || normalized['Column K'] || normalized['K'] || '',
         'AA Date': normalized['AA Date'] || normalized['Column L'] || normalized['L'] || '',
         'TS Status': normalized['TS Status'] || normalized['Column M'] || normalized['M'] || '',
-        'Column N': normalized['Column N'] || normalized['N'] || '', // Dual purpose: Date (when M='G') or Amount (when M='TS')
         'TS Amount': normalized['TS Amount'] || normalized['TS (Rs. Lakh)'] || normalized['Column N'] || normalized['N'] || '',
         'TS Date': normalized['TS Date'] || normalized['Column O'] || normalized['O'] || '',
         'DTP Status': normalized['DTP Status'] || normalized['Column P'] || normalized['P'] || '',
-        'Column Q': normalized['Column Q'] || normalized['Q'] || '', // Dual purpose: Date (when P='G') or Amount (when P='DTP')
         'DTP Amount': normalized['DTP Amount'] || normalized['DTP (Rs. Lakh)'] || normalized['Column Q'] || normalized['Q'] || '',
         'DTP Date': normalized['DTP Date'] || normalized['Column R'] || normalized['R'] || '',
         'Closing Date': normalized['Closing Date'] || normalized['Column S'] || normalized['S'] || '',
@@ -369,7 +366,6 @@ function App() {
         'Agency Name': normalized['Agency Name'] || normalized['Column U'] || normalized['U'] || '',
         '% of Tender': normalized['% of Tender'] || normalized['Column V'] || normalized['V'] || '',
         'Proposal Status': normalized['Proposal Status'] || normalized['Column W'] || normalized['W'] || '',
-        'Column X': normalized['Column X'] || normalized['X'] || '', // Dual purpose: Date (when W='G') or Amount (when W='TA')
         'Approved Amount': normalized['Approved Amount'] || normalized['Column X'] || normalized['X'] || '',
         'App. Date': normalized['App. Date'] || normalized['Approval Date'] || normalized['Column Y'] || normalized['Y'] || '',
         'LOA Date': normalized['LOA Date'] || normalized['Column Z'] || normalized['Z'] || '',
@@ -447,26 +443,6 @@ function App() {
       // Get Column AC status early - needed for all alerts
       const acStatus = project['Column AC']?.trim().toLowerCase() || '';
       
-      // Get G tracking dates - ONLY parse as date when status is 'G'
-      // These columns serve dual purpose: Date when status='G', Amount when status='AA'/'TS'/'DTP'/'TA'
-      // Enhanced parsing for better date detection
-      const parseGovtDate = (value) => {
-        if (!value) return null;
-        const strValue = String(value).trim();
-        if (!strValue) return null;
-        
-        // If it's a pure number (amount), skip parsing
-        if (/^\d+(\.\d+)?$/.test(strValue)) return null;
-        
-        // Try parsing as date (handles DD.MM.YYYY and other formats)
-        return parseDate(strValue);
-      };
-      
-      const beGDate = beStatus === 'G' ? parseGovtDate(project['Column K']) : null;
-      const tsGDate = tsStatus === 'G' ? parseGovtDate(project['Column N']) : null;
-      const dtpGDate = dtpStatus === 'G' ? parseGovtDate(project['Column Q']) : null;
-      const proposalGDate = proposalStatus === 'G' ? parseGovtDate(project['Column X']) : null;
-      
       // === RED ALERTS SECTION ===
       // IMPORTANT: All alerts require Column AC = "Not Started"
       
@@ -499,100 +475,69 @@ function App() {
           }
         }
         
-        // 2. Stuck at Govt Alert - Check columns J, M, P, W for status 'G'
-        // BE Status = G (Column J), tracking date in Column K
-        if (beStatus === 'G') {
-          if (beGDate) {
-            const daysStuck = differenceInDays(new Date(), beGDate);
-            if (daysStuck > 15) {
-              redAlerts.push({ 
-                ...project, 
-                alertType: 'Stuck at Govt - BE',
-                alertPriority: 2,
-                daysStuck,
-                stage: 'BE Status'
-              });
-            }
-          } else {
+        // 2. Stuck at Govt Alert - Based on previous stage completion date
+        // BE Status = G (waiting for AA approval) - use PAA Date (Column I)
+        if (beStatus === 'G' && paaDate) {
+          const daysStuck = differenceInDays(new Date(), paaDate);
+          if (daysStuck > 15) {
             redAlerts.push({ 
               ...project, 
               alertType: 'Stuck at Govt - BE',
               alertPriority: 2,
-              noDateFound: true,
-              stage: 'BE Status'
+              daysStuck,
+              stage: 'BE Status',
+              fromDate: 'PAA Date'
             });
           }
         }
         
-        // TS Status = G (Column M), tracking date in Column N
-        if (tsStatus === 'G') {
-          if (tsGDate) {
-            const daysStuck = differenceInDays(new Date(), tsGDate);
-            if (daysStuck > 15) {
-              redAlerts.push({ 
-                ...project, 
-                alertType: 'Stuck at Govt - TS',
-                alertPriority: 2,
-                daysStuck,
-                stage: 'TS Status'
-              });
-            }
-          } else {
+        // TS Status = G (waiting for TS approval) - use AA Date (Column L)
+        if (tsStatus === 'G' && aaDate) {
+          const daysStuck = differenceInDays(new Date(), aaDate);
+          if (daysStuck > 15) {
             redAlerts.push({ 
               ...project, 
               alertType: 'Stuck at Govt - TS',
               alertPriority: 2,
-              noDateFound: true,
-              stage: 'TS Status'
+              daysStuck,
+              stage: 'TS Status',
+              fromDate: 'AA Date'
             });
           }
         }
         
-        // DTP Status = G (Column P), tracking date in Column Q
-        if (dtpStatus === 'G') {
-          if (dtpGDate) {
-            const daysStuck = differenceInDays(new Date(), dtpGDate);
-            if (daysStuck > 15) {
-              redAlerts.push({ 
-                ...project, 
-                alertType: 'Stuck at Govt - DTP',
-                alertPriority: 2,
-                daysStuck,
-                stage: 'DTP Status'
-              });
-            }
-          } else {
+        // DTP Status = G (waiting for DTP approval) - use TS Date (Column O)
+        if (dtpStatus === 'G' && tsDate) {
+          const daysStuck = differenceInDays(new Date(), tsDate);
+          if (daysStuck > 15) {
             redAlerts.push({ 
               ...project, 
               alertType: 'Stuck at Govt - DTP',
               alertPriority: 2,
-              noDateFound: true,
-              stage: 'DTP Status'
+              daysStuck,
+              stage: 'DTP Status',
+              fromDate: 'TS Date'
             });
           }
         }
         
-        // Proposal Status = G (Column W), tracking date in Column X
+        // Proposal Status = G (waiting for tender approval) - use DTP Date or Opened Date
         if (proposalStatus === 'G') {
-          if (proposalGDate) {
-            const daysStuck = differenceInDays(new Date(), proposalGDate);
+          const dtpApprovalDate = parseDate(project['DTP Date']);
+          const referenceDate = dtpApprovalDate || openedDate;
+          
+          if (referenceDate) {
+            const daysStuck = differenceInDays(new Date(), referenceDate);
             if (daysStuck > 15) {
               redAlerts.push({ 
                 ...project, 
                 alertType: 'Stuck at Govt - Proposal',
                 alertPriority: 2,
                 daysStuck,
-                stage: 'Proposal Status'
+                stage: 'Proposal Status',
+                fromDate: dtpApprovalDate ? 'DTP Date' : 'Opened Date'
               });
             }
-          } else {
-            redAlerts.push({ 
-              ...project, 
-              alertType: 'Stuck at Govt - Proposal',
-              alertPriority: 2,
-              noDateFound: true,
-              stage: 'Proposal Status'
-            });
           }
         }
         
