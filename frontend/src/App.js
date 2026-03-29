@@ -301,16 +301,16 @@ function App() {
         id: index,
         'Work Name': normalized['Work Name'] || normalized['Name'] || normalized['A'] || '',
         'Division': normalized['Division'] || normalized['Dist'] || '',
-        'PAA Amount': normalized['PAA Amount'] || normalized['Column H'] || normalized['H'] || '',
+        'PAA Amount': normalized['PAA Amount'] || normalized['PAA (Rs. Lakh)'] || normalized['Column H'] || normalized['H'] || '',
         'PAA Date': normalized['PAA Date'] || normalized['Column I'] || normalized['I'] || '',
         'BE Status': normalized['BE Status'] || normalized['Column J'] || normalized['J'] || '',
-        'AA Amount': normalized['AA Amount'] || normalized['Column K'] || normalized['K'] || '',
+        'AA Amount': normalized['AA Amount'] || normalized['AA (Rs. Lakh)'] || normalized['Column K'] || normalized['K'] || '',
         'AA Date': normalized['AA Date'] || normalized['Column L'] || normalized['L'] || '',
         'TS Status': normalized['TS Status'] || normalized['Column M'] || normalized['M'] || '',
-        'TS Amount': normalized['TS Amount'] || normalized['Column N'] || normalized['N'] || '',
+        'TS Amount': normalized['TS Amount'] || normalized['TS (Rs. Lakh)'] || normalized['Column N'] || normalized['N'] || '',
         'TS Date': normalized['TS Date'] || normalized['Column O'] || normalized['O'] || '',
         'DTP Status': normalized['DTP Status'] || normalized['Column P'] || normalized['P'] || '',
-        'DTP Amount': normalized['DTP Amount'] || normalized['Column Q'] || normalized['Q'] || '',
+        'DTP Amount': normalized['DTP Amount'] || normalized['DTP (Rs. Lakh)'] || normalized['Column Q'] || normalized['Q'] || '',
         'DTP Date': normalized['DTP Date'] || normalized['Column R'] || normalized['R'] || '',
         'Closing Date': normalized['Closing Date'] || normalized['Column S'] || normalized['S'] || '',
         'Opened Date': normalized['Opened Date'] || normalized['Opening Date'] || normalized['Column T'] || normalized['T'] || '',
@@ -321,20 +321,14 @@ function App() {
         'App. Date': normalized['App. Date'] || normalized['Approval Date'] || normalized['Column Y'] || normalized['Y'] || '',
         'LOA Date': normalized['LOA Date'] || normalized['Column Z'] || normalized['Z'] || '',
         'WO Date': normalized['WO Date'] || normalized['W.O. Date'] || normalized['Column AA'] || normalized['AA'] || '',
-        'Column AC': normalized['Column AC'] || normalized['AC'] || normalized['Status'] || '',
+        'Column AC': normalized['Column AC'] || normalized['Status'] || normalized['AC'] || '',
         'Year': normalized['Year'] || normalized['Column AM'] || normalized['AM'] || '',
         'Time': normalized['Time'] || normalized['Column AN'] || normalized['AN'] || '',
-        'Amount Category': normalized['Amount Category'] || normalized['Column AO'] || normalized['AO'] || '',
-        'Year YYYY': normalized['Year YYYY'] || normalized['Column AP'] || normalized['AP'] || '',
+        'Amount Category': normalized['Amount Category'] || normalized['Amount'] || normalized['Column AO'] || normalized['AO'] || '',
+        'Year YYYY': normalized['Year YYYY'] || normalized['Year (YYYY)'] || normalized['Column AP'] || normalized['AP'] || '',
         'Route Type': normalized['Route Type'] || '',
         ...normalized
       };
-      
-      // Debug: Log if PAA Amount is missing
-      if (!result['PAA Amount'] && index < 5) {
-        console.log(`Row ${index} - Missing PAA Amount. Available keys:`, Object.keys(normalized));
-        console.log(`Row ${index} - Checking: H='${normalized['H']}', Column H='${normalized['Column H']}', PAA Amount='${normalized['PAA Amount']}'`);
-      }
       
       return result;
     });
