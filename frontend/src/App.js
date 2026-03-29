@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import './App.css';
 
@@ -278,23 +278,33 @@ function App() {
       
       return {
         id: index,
-        'Work Name': normalized['Work Name'] || normalized['Name'] || '',
+        'Work Name': normalized['Work Name'] || normalized['Name'] || normalized['A'] || '',
         'Division': normalized['Division'] || normalized['Dist'] || '',
         'PAA Amount': normalized['PAA Amount'] || normalized['Column H'] || normalized['H'] || '',
         'PAA Date': normalized['PAA Date'] || normalized['Column I'] || normalized['I'] || '',
         'BE Status': normalized['BE Status'] || normalized['Column J'] || normalized['J'] || '',
-        'AA Date': normalized['AA Date'] || '',
+        'AA Amount': normalized['AA Amount'] || normalized['Column K'] || normalized['K'] || '',
+        'AA Date': normalized['AA Date'] || normalized['Column L'] || normalized['L'] || '',
         'TS Status': normalized['TS Status'] || normalized['Column M'] || normalized['M'] || '',
+        'TS Amount': normalized['TS Amount'] || normalized['Column N'] || normalized['N'] || '',
+        'TS Date': normalized['TS Date'] || normalized['Column O'] || normalized['O'] || '',
         'DTP Status': normalized['DTP Status'] || normalized['Column P'] || normalized['P'] || '',
-        'Online Date': normalized['Online Date'] || normalized['Column S'] || normalized['S'] || '',
-        'Closing Date': normalized['Closing Date'] || normalized['Column T'] || normalized['T'] || '',
-        'Opening Date': normalized['Opening Date'] || normalized['Column U'] || normalized['U'] || '',
-        'Evaluation Date': normalized['Evaluation Date'] || normalized['Column V'] || normalized['V'] || '',
+        'DTP Amount': normalized['DTP Amount'] || normalized['Column Q'] || normalized['Q'] || '',
+        'DTP Date': normalized['DTP Date'] || normalized['Column R'] || normalized['R'] || '',
+        'Closing Date': normalized['Closing Date'] || normalized['Column S'] || normalized['S'] || '',
+        'Opened Date': normalized['Opened Date'] || normalized['Opening Date'] || normalized['Column T'] || normalized['T'] || '',
+        'Agency Name': normalized['Agency Name'] || normalized['Column U'] || normalized['U'] || '',
+        '% of Tender': normalized['% of Tender'] || normalized['Column V'] || normalized['V'] || '',
         'Proposal Status': normalized['Proposal Status'] || normalized['Column W'] || normalized['W'] || '',
-        'Dispatch Date': normalized['Dispatch Date'] || normalized['Column Y'] || normalized['Y'] || '',
+        'Approved Amount': normalized['Approved Amount'] || normalized['Column X'] || normalized['X'] || '',
+        'App. Date': normalized['App. Date'] || normalized['Approval Date'] || normalized['Column Y'] || normalized['Y'] || '',
         'LOA Date': normalized['LOA Date'] || normalized['Column Z'] || normalized['Z'] || '',
-        'WO Date': normalized['WO Date'] || normalized['Column AA'] || normalized['AA'] || '',
+        'WO Date': normalized['WO Date'] || normalized['W.O. Date'] || normalized['Column AA'] || normalized['AA'] || '',
         'Column AC': normalized['Column AC'] || normalized['AC'] || normalized['Status'] || '',
+        'Year': normalized['Year'] || normalized['Column AM'] || normalized['AM'] || '',
+        'Time': normalized['Time'] || normalized['Column AN'] || normalized['AN'] || '',
+        'Amount Category': normalized['Amount Category'] || normalized['Column AO'] || normalized['AO'] || '',
+        'Year YYYY': normalized['Year YYYY'] || normalized['Column AP'] || normalized['AP'] || '',
         'Route Type': normalized['Route Type'] || '',
         ...normalized
       };
@@ -334,16 +344,27 @@ function App() {
   const metrics = useMemo(() => {
     const redAlerts = [];
     const pendingAA = [];
-    const pendingApprovals = [];
+    const pendingTS = [];
+    const pendingDTP = [];
+    const tenderLevel = [];
+    const tenderApprovals = [];
+    const loaWOLevel = [];
     const executionPhase = [];
     const highPriority = [];
     
     filteredProjects.forEach(project => {
       const closingDate = parseDate(project['Closing Date']);
-      const dispatchDate = parseDate(project['Dispatch Date']);
       const beStatus = project['BE Status']?.trim();
       const paaDate = parseDate(project['PAA Date']);
       const aaDate = parseDate(project['AA Date']);
+      const tsStatus = project['TS Status']?.trim();
+      const tsDate = parseDate(project['TS Date']);
+      const dtpStatus = project['DTP Status']?.trim();
+      const dtpDate = parseDate(project['DTP Date']);
+      const proposalStatus = project['Proposal Status']?.trim();
+      const openedDate = parseDate(project['Opened Date']);
+      const agencyName = project['Agency Name']?.trim();
+      const loaDate = parseDate(project['LOA Date']);
       const woDate = parseDate(project['WO Date']);
       const routeType = project['Route Type']?.toLowerCase() || '';
       
@@ -355,25 +376,57 @@ function App() {
         }
       }
       
-      // Red Alerts - G Bottleneck
-      if (beStatus === 'G' && dispatchDate) {
-        const daysAtG = differenceInDays(new Date(), dispatchDate);
-        if (daysAtG > 60) {
-          redAlerts.push({ ...project, alertType: 'G Bottleneck', daysAtG });
+      // Red Alerts - G Bottleneck (at any stage)
+      if (beStatus === 'G' || tsStatus === 'G' || dtpStatus === 'G' || proposalStatus === 'G') {
+        // Check how long stuck at G
+        const appDate = parseDate(project['App. Date']);
+        if (appDate) {
+          const daysAtG = differenceInDays(new Date(), appDate);
+          if (daysAtG > 60) {
+            redAlerts.push({ ...project, alertType: 'G Bottleneck', daysAtG });
+          }
         }
       }
       
-      // Pending AA Works
+      // Skip Dropped (X) and Old Completed (OC) works
+      if (proposalStatus === 'X' || proposalStatus === 'OC') {
+        return;
+      }
+      
+      // Pending AA Works - has PAA but no AA
       if (paaDate && !aaDate && ['D', 'C', 'G'].includes(beStatus)) {
         pendingAA.push(project);
       }
       
-      // Pending Approvals
-      if (['D', 'C', 'G'].includes(beStatus) && !woDate) {
-        pendingApprovals.push(project);
+      // Pending TS - has AA but no TS
+      if (aaDate && !tsDate && ['D', 'C', 'G'].includes(tsStatus)) {
+        pendingTS.push(project);
       }
       
-      // Execution Phase
+      // Pending DTP - has TS but no DTP
+      if (tsDate && !dtpDate && ['D', 'C', 'G'].includes(dtpStatus)) {
+        pendingDTP.push(project);
+      }
+      
+      // Tender Level - has DTP, in tender process but no TA
+      if (dtpDate && proposalStatus !== 'TA' && !woDate) {
+        // Check if in tender stage (has closing date or is pending for online)
+        if (closingDate || ['D', 'C', 'G'].includes(proposalStatus)) {
+          tenderLevel.push(project);
+        }
+      }
+      
+      // Tender Approvals - waiting for TA at D/C/G
+      if (['D', 'C', 'G'].includes(proposalStatus) && agencyName) {
+        tenderApprovals.push(project);
+      }
+      
+      // LOA-WO Level - has TA but no WO
+      if (proposalStatus === 'TA' && !woDate) {
+        loaWOLevel.push(project);
+      }
+      
+      // Execution Phase - has WO
       if (woDate) {
         executionPhase.push(project);
       }
@@ -384,7 +437,17 @@ function App() {
       }
     });
     
-    return { redAlerts, pendingAA, pendingApprovals, executionPhase, highPriority };
+    return { 
+      redAlerts, 
+      pendingAA, 
+      pendingTS, 
+      pendingDTP, 
+      tenderLevel, 
+      tenderApprovals, 
+      loaWOLevel, 
+      executionPhase, 
+      highPriority 
+    };
   }, [filteredProjects]);
   
   // Get status distribution from Column AC
@@ -443,7 +506,23 @@ function App() {
         if (!dateB) return -1;
         return dateA - dateB;
       });
-      case 'pendingApprovals': return metrics.pendingApprovals;
+      case 'pendingTS': return metrics.pendingTS.sort((a, b) => {
+        const dateA = parseDate(a['AA Date']);
+        const dateB = parseDate(b['AA Date']);
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA - dateB;
+      });
+      case 'pendingDTP': return metrics.pendingDTP.sort((a, b) => {
+        const dateA = parseDate(a['TS Date']);
+        const dateB = parseDate(b['TS Date']);
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA - dateB;
+      });
+      case 'tenderLevel': return metrics.tenderLevel;
+      case 'tenderApprovals': return metrics.tenderApprovals;
+      case 'loaWOLevel': return metrics.loaWOLevel;
       case 'executionPhase': return metrics.executionPhase;
       case 'highPriority': return metrics.highPriority;
       default: return [];
@@ -691,7 +770,7 @@ function App() {
         {/* Stats Cards */}
         {projects.length > 0 && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <Card 
                 className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'redAlerts' ? 'ring-2 ring-red-500' : ''}`}
                 onClick={() => setActiveFilter(activeFilter === 'redAlerts' ? null : 'redAlerts')}
@@ -723,16 +802,76 @@ function App() {
               </Card>
               
               <Card 
-                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'pendingApprovals' ? 'ring-2 ring-orange-500' : ''}`}
-                onClick={() => setActiveFilter(activeFilter === 'pendingApprovals' ? null : 'pendingApprovals')}
+                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'pendingTS' ? 'ring-2 ring-indigo-500' : ''}`}
+                onClick={() => setActiveFilter(activeFilter === 'pendingTS' ? null : 'pendingTS')}
               >
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-slate-600">Pending Approvals</p>
-                      <p className="text-3xl font-bold text-orange-600 mt-2">{metrics.pendingApprovals.length}</p>
+                      <p className="text-sm font-medium text-slate-600">Pending TS</p>
+                      <p className="text-3xl font-bold text-indigo-600 mt-2">{metrics.pendingTS.length}</p>
                     </div>
-                    <Clock className="w-8 h-8 text-orange-500" />
+                    <FileCheck className="w-8 h-8 text-indigo-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'pendingDTP' ? 'ring-2 ring-cyan-500' : ''}`}
+                onClick={() => setActiveFilter(activeFilter === 'pendingDTP' ? null : 'pendingDTP')}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">Pending DTP</p>
+                      <p className="text-3xl font-bold text-cyan-600 mt-2">{metrics.pendingDTP.length}</p>
+                    </div>
+                    <FilePlus className="w-8 h-8 text-cyan-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'tenderLevel' ? 'ring-2 ring-amber-500' : ''}`}
+                onClick={() => setActiveFilter(activeFilter === 'tenderLevel' ? null : 'tenderLevel')}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">Tender Level</p>
+                      <p className="text-3xl font-bold text-amber-600 mt-2">{metrics.tenderLevel.length}</p>
+                    </div>
+                    <Gavel className="w-8 h-8 text-amber-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'tenderApprovals' ? 'ring-2 ring-orange-500' : ''}`}
+                onClick={() => setActiveFilter(activeFilter === 'tenderApprovals' ? null : 'tenderApprovals')}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">Tender Approvals</p>
+                      <p className="text-3xl font-bold text-orange-600 mt-2">{metrics.tenderApprovals.length}</p>
+                    </div>
+                    <Clipboard className="w-8 h-8 text-orange-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'loaWOLevel' ? 'ring-2 ring-teal-500' : ''}`}
+                onClick={() => setActiveFilter(activeFilter === 'loaWOLevel' ? null : 'loaWOLevel')}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">LOA-WO Level</p>
+                      <p className="text-3xl font-bold text-teal-600 mt-2">{metrics.loaWOLevel.length}</p>
+                    </div>
+                    <Handshake className="w-8 h-8 text-teal-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -751,21 +890,6 @@ function App() {
                   </div>
                 </CardContent>
               </Card>
-              
-              <Card 
-                className={`cursor-pointer transition-all hover:shadow-lg ${activeFilter === 'highPriority' ? 'ring-2 ring-blue-500' : ''}`}
-                onClick={() => setActiveFilter(activeFilter === 'highPriority' ? null : 'highPriority')}
-              >
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-600">High Priority</p>
-                      <p className="text-3xl font-bold text-blue-600 mt-2">{metrics.highPriority.length}</p>
-                    </div>
-                    <TrendingUp className="w-8 h-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
             </div>
             
             {/* Active Filter List */}
@@ -776,11 +900,15 @@ function App() {
                     <CardTitle>
                       {activeFilter === 'redAlerts' && '🚨 Red Alerts'}
                       {activeFilter === 'pendingAA' && '📋 Pending AA Works'}
-                      {activeFilter === 'pendingApprovals' && '⏳ Approvals Pending'}
+                      {activeFilter === 'pendingTS' && '🔧 Pending TS Works'}
+                      {activeFilter === 'pendingDTP' && '📝 Pending DTP Works'}
+                      {activeFilter === 'tenderLevel' && '📢 Tender Level Works'}
+                      {activeFilter === 'tenderApprovals' && '✅ Tender Approvals'}
+                      {activeFilter === 'loaWOLevel' && '🤝 LOA-WO Level'}
                       {activeFilter === 'executionPhase' && '🚧 Execution Phase'}
                       {activeFilter === 'highPriority' && '🎯 High Priority Routes'}
                     </CardTitle>
-                    {(activeFilter === 'pendingAA' || activeFilter === 'pendingApprovals') && (
+                    {(activeFilter === 'pendingAA' || activeFilter === 'pendingTS' || activeFilter === 'pendingDTP' || activeFilter === 'tenderApprovals') && (
                       <div className="flex gap-2">
                         {(() => {
                           const breakdown = getBreakdown(filteredList);
