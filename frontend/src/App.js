@@ -353,12 +353,15 @@ function App() {
         'PAA Amount': normalized['PAA Amount'] || normalized['PAA (Rs. Lakh)'] || normalized['Column H'] || normalized['H'] || '',
         'PAA Date': normalized['PAA Date'] || normalized['Column I'] || normalized['I'] || '',
         'BE Status': normalized['BE Status'] || normalized['Column J'] || normalized['J'] || '',
+        'BE G Date': normalized['BE G Date'] || normalized['Column K'] || normalized['K'] || '', // Tracking date when sent to G
         'AA Amount': normalized['AA Amount'] || normalized['AA (Rs. Lakh)'] || normalized['Column K'] || normalized['K'] || '',
         'AA Date': normalized['AA Date'] || normalized['Column L'] || normalized['L'] || '',
         'TS Status': normalized['TS Status'] || normalized['Column M'] || normalized['M'] || '',
+        'TS G Date': normalized['TS G Date'] || normalized['Column N'] || normalized['N'] || '', // Tracking date when sent to G
         'TS Amount': normalized['TS Amount'] || normalized['TS (Rs. Lakh)'] || normalized['Column N'] || normalized['N'] || '',
         'TS Date': normalized['TS Date'] || normalized['Column O'] || normalized['O'] || '',
         'DTP Status': normalized['DTP Status'] || normalized['Column P'] || normalized['P'] || '',
+        'DTP G Date': normalized['DTP G Date'] || normalized['Column Q'] || normalized['Q'] || '', // Tracking date when sent to G
         'DTP Amount': normalized['DTP Amount'] || normalized['DTP (Rs. Lakh)'] || normalized['Column Q'] || normalized['Q'] || '',
         'DTP Date': normalized['DTP Date'] || normalized['Column R'] || normalized['R'] || '',
         'Closing Date': normalized['Closing Date'] || normalized['Column S'] || normalized['S'] || '',
@@ -366,6 +369,7 @@ function App() {
         'Agency Name': normalized['Agency Name'] || normalized['Column U'] || normalized['U'] || '',
         '% of Tender': normalized['% of Tender'] || normalized['Column V'] || normalized['V'] || '',
         'Proposal Status': normalized['Proposal Status'] || normalized['Column W'] || normalized['W'] || '',
+        'Proposal G Date': normalized['Proposal G Date'] || normalized['Column X'] || normalized['X'] || '', // Tracking date when sent to G
         'Approved Amount': normalized['Approved Amount'] || normalized['Column X'] || normalized['X'] || '',
         'App. Date': normalized['App. Date'] || normalized['Approval Date'] || normalized['Column Y'] || normalized['Y'] || '',
         'LOA Date': normalized['LOA Date'] || normalized['Column Z'] || normalized['Z'] || '',
@@ -438,24 +442,150 @@ function App() {
       const loaDate = parseDate(project['LOA Date']);
       const woDate = parseDate(project['WO Date']);
       const routeType = project['Route Type']?.toLowerCase() || '';
+      const appDate = parseDate(project['App. Date']);
       
-      // Red Alerts - Bid Validity
-      if (closingDate) {
-        const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
-        if (daysRemaining < 30 && daysRemaining > 0) {
-          redAlerts.push({ ...project, alertType: 'Bid Validity', daysRemaining });
+      // Get G tracking dates
+      const beGDate = parseDate(project['BE G Date']);
+      const tsGDate = parseDate(project['TS G Date']);
+      const dtpGDate = parseDate(project['DTP G Date']);
+      const proposalGDate = parseDate(project['Proposal G Date']);
+      
+      // === RED ALERTS SECTION ===
+      
+      // 1. Stuck at Govt Alert - Check columns J, M, P, W for status 'G'
+      // BE Status = G (Column J), tracking date in Column K
+      if (beStatus === 'G') {
+        if (beGDate) {
+          const daysStuck = differenceInDays(new Date(), beGDate);
+          if (daysStuck > 15) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Stuck at Govt - BE', 
+              daysStuck,
+              stage: 'BE Status'
+            });
+          }
+        } else {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'Stuck at Govt - BE', 
+            noDateFound: true,
+            stage: 'BE Status'
+          });
         }
       }
       
-      // Red Alerts - G Bottleneck (at any stage)
-      if (beStatus === 'G' || tsStatus === 'G' || dtpStatus === 'G' || proposalStatus === 'G') {
-        // Check how long stuck at G
-        const appDate = parseDate(project['App. Date']);
-        if (appDate) {
-          const daysAtG = differenceInDays(new Date(), appDate);
-          if (daysAtG > 60) {
-            redAlerts.push({ ...project, alertType: 'G Bottleneck', daysAtG });
+      // TS Status = G (Column M), tracking date in Column N
+      if (tsStatus === 'G') {
+        if (tsGDate) {
+          const daysStuck = differenceInDays(new Date(), tsGDate);
+          if (daysStuck > 15) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Stuck at Govt - TS', 
+              daysStuck,
+              stage: 'TS Status'
+            });
           }
+        } else {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'Stuck at Govt - TS', 
+            noDateFound: true,
+            stage: 'TS Status'
+          });
+        }
+      }
+      
+      // DTP Status = G (Column P), tracking date in Column Q
+      if (dtpStatus === 'G') {
+        if (dtpGDate) {
+          const daysStuck = differenceInDays(new Date(), dtpGDate);
+          if (daysStuck > 15) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Stuck at Govt - DTP', 
+              daysStuck,
+              stage: 'DTP Status'
+            });
+          }
+        } else {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'Stuck at Govt - DTP', 
+            noDateFound: true,
+            stage: 'DTP Status'
+          });
+        }
+      }
+      
+      // Proposal Status = G (Column W), tracking date in Column X
+      if (proposalStatus === 'G') {
+        if (proposalGDate) {
+          const daysStuck = differenceInDays(new Date(), proposalGDate);
+          if (daysStuck > 15) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Stuck at Govt - Proposal', 
+              daysStuck,
+              stage: 'Proposal Status'
+            });
+          }
+        } else {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'Stuck at Govt - Proposal', 
+            noDateFound: true,
+            stage: 'Proposal Status'
+          });
+        }
+      }
+      
+      // 2. Tender Alert - If P=DTP, W=D, and Closing Date (S) crossed >15 days
+      if (dtpStatus === 'DTP' && proposalStatus === 'D' && closingDate) {
+        const daysMissed = differenceInDays(new Date(), closingDate);
+        if (daysMissed > 15) {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'Tender Opening Missed', 
+            daysMissed
+          });
+        }
+      }
+      
+      // 3. Bid Validity Alert - Enhanced with P=DTP requirement
+      if (dtpStatus === 'DTP' && closingDate) {
+        const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
+        if (daysRemaining < 30 && daysRemaining > 0) {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'Bid Validity Expiring', 
+            daysRemaining 
+          });
+        }
+      }
+      
+      // 4. LOA Alert - Tender App. Date (Y) crossing 15 days
+      if (appDate && !loaDate) {
+        const daysPending = differenceInDays(new Date(), appDate);
+        if (daysPending > 15) {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'LOA Pending', 
+            daysPending
+          });
+        }
+      }
+      
+      // 5. WO Alert - LOA Date (Z) crossed 20 days
+      if (loaDate && !woDate) {
+        const daysPending = differenceInDays(new Date(), loaDate);
+        if (daysPending > 20) {
+          redAlerts.push({ 
+            ...project, 
+            alertType: 'WO Pending', 
+            daysPending
+          });
         }
       }
       
@@ -1300,7 +1430,7 @@ function ProjectRow({ project, onClick, showAlert }) {
         <span>{currentStatus}</span>
       </div>
       
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
         {beStatus && (
           <Badge variant="outline" className="text-xs">
             {beStatus === 'D' && 'Division'}
@@ -1310,15 +1440,41 @@ function ProjectRow({ project, onClick, showAlert }) {
           </Badge>
         )}
         
-        {showAlert && project.alertType === 'Bid Validity' && (
+        {/* Stuck at Govt Alerts */}
+        {showAlert && project.alertType?.includes('Stuck at Govt') && (
           <Badge variant="destructive" className="text-xs">
-            ⚠️ {project.daysRemaining} days left
+            {project.noDateFound 
+              ? `⚠️ ${project.stage}: No Date Found for Tracking`
+              : `🚨 ${project.stage}: Stuck for ${project.daysStuck} days`
+            }
           </Badge>
         )}
         
-        {showAlert && project.alertType === 'G Bottleneck' && (
+        {/* Tender Opening Missed Alert */}
+        {showAlert && project.alertType === 'Tender Opening Missed' && (
           <Badge variant="destructive" className="text-xs">
-            ⚠️ Stuck for {project.daysAtG} days
+            📢 Tender Opening Missed by {project.daysMissed} days
+          </Badge>
+        )}
+        
+        {/* Bid Validity Alert */}
+        {showAlert && project.alertType === 'Bid Validity Expiring' && (
+          <Badge variant="destructive" className="text-xs">
+            ⏰ Bid Validity: {project.daysRemaining} days left
+          </Badge>
+        )}
+        
+        {/* LOA Pending Alert */}
+        {showAlert && project.alertType === 'LOA Pending' && (
+          <Badge variant="destructive" className="text-xs">
+            📋 LOA Pending for {project.daysPending} days
+          </Badge>
+        )}
+        
+        {/* WO Pending Alert */}
+        {showAlert && project.alertType === 'WO Pending' && (
+          <Badge variant="destructive" className="text-xs">
+            📝 WO Pending for {project.daysPending} days
           </Badge>
         )}
         
