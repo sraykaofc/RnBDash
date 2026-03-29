@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -132,14 +132,28 @@ const calculateCurrentStatus = (project) => {
   return 'Unknown Status';
 };
 
+// Predefined Google Sheet URL
+const PREDEFINED_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1fvb5M7f-rajXCgPF7ntDiQaeD6mJwq_5jdo6TL_NsKQ/edit?gid=0#gid=0';
+
 function App() {
   const [projects, setProjects] = useState([]);
   const [activeFilter, setActiveFilter] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [googleSheetUrl, setGoogleSheetUrl] = useState('');
+  const [googleSheetUrl, setGoogleSheetUrl] = useState(PREDEFINED_SHEET_URL);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDataTable, setShowDataTable] = useState(false);
   const [selectedDivisions, setSelectedDivisions] = useState([]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Auto-load predefined Google Sheet on initial page load
+  useEffect(() => {
+    if (isInitialLoad && projects.length === 0) {
+      setIsInitialLoad(false);
+      // Automatically import the predefined sheet
+      handleGoogleSheetImport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialLoad, projects.length]);
   
   // Parse CSV data
   const handleFileUpload = (event) => {
@@ -422,16 +436,14 @@ function App() {
       }
       
       // Pending TS - has AA but TS not approved yet
-      // TS is approved when TS Status = 'TS' OR has TS Date
-      const hasTS = tsStatus === 'TS' || tsDate;
-      if (aaDate && !hasTS) {
+      // Only count if TS Status is explicitly D, C, or G
+      if (aaDate && ['D', 'C', 'G'].includes(tsStatus) && !tsDate) {
         pendingTS.push(project);
       }
       
       // Pending DTP - has TS but DTP not approved yet
-      // DTP is approved when DTP Status = 'DTP' OR has DTP Date
-      const hasDTP = dtpStatus === 'DTP' || dtpDate;
-      if (hasTS && !hasDTP) {
+      // Only count if DTP Status is explicitly D, C, or G
+      if (tsDate && ['D', 'C', 'G'].includes(dtpStatus) && !dtpDate) {
         pendingDTP.push(project);
       }
       
