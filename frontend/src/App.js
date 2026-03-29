@@ -83,13 +83,18 @@ const calculateCurrentStatus = (project) => {
   const dtpStatus = project['DTP Status']?.trim();
   const tsStatus = project['TS Status']?.trim();
   const beStatus = project['BE Status']?.trim();
-  const onlineDate = parseDate(project['Online Date']);
   const closingDate = parseDate(project['Closing Date']);
-  const openingDate = parseDate(project['Opening Date']);
-  const evaluationDate = parseDate(project['Evaluation Date']);
+  const openedDate = parseDate(project['Opened Date']);
+  const agencyName = project['Agency Name']?.trim();
   
-  // TA / LOA / WO / In Progress
+  // LOA-WO Level (for TA with AC = Not Started)
   if (proposalStatus === 'TA') {
+    const acLower = acValue?.toLowerCase() || '';
+    if (acLower === 'not started') {
+      if (!loaDate) return 'LOA Level';
+      if (loaDate && !woDate) return 'WO Level';
+    }
+    // Regular TA handling
     if (woDate && loaDate) {
       return acValue || 'In Progress';
     } else if (loaDate) {
@@ -99,18 +104,24 @@ const calculateCurrentStatus = (project) => {
     }
   }
   
-  // Tender Proposal
-  if (dtpStatus === 'DTP' || ['D', 'C', 'G'].includes(proposalStatus)) {
-    if (evaluationDate) {
-      if (proposalStatus === 'D') return 'Tender Proposal at D';
-      if (proposalStatus === 'C') return 'Tender Proposal at C';
-      if (proposalStatus === 'G') return 'Tender Proposal at G';
+  // Tender Level & Tender Approvals (P=DTP, W=D/C/G)
+  if (dtpStatus === 'DTP' && proposalStatus === 'D') {
+    // Tender Level - determine stage
+    if (!closingDate && !openedDate && !agencyName) {
+      return 'Pending for Online';
+    } else if (closingDate && !openedDate) {
+      return 'Tender Online';
+    } else if (closingDate && openedDate && !agencyName) {
       return 'Tender Under Evaluation';
     }
-    if (openingDate) return 'Tender Online';
-    if (closingDate) return 'Tender Online';
-    if (onlineDate) return 'Tender Online';
-    if (dtpStatus === 'DTP') return 'Pending for Online';
+  }
+  
+  // Tender Approvals - has agency, waiting for approval
+  if (dtpStatus === 'DTP' && ['D', 'C', 'G'].includes(proposalStatus) && 
+      (closingDate || openedDate || agencyName)) {
+    if (proposalStatus === 'D') return 'Proposal at D';
+    if (proposalStatus === 'C') return 'Proposal at C';
+    if (proposalStatus === 'G') return 'Proposal at G';
   }
   
   // DTP
@@ -448,13 +459,15 @@ function App() {
         return;
       }
       
+      // Get Column AC status once
+      const acStatus = project['Column AC']?.trim().toLowerCase() || '';
+      
       // Pending AA Works - has PAA but no AA
       if (paaDate && !aaDate && ['D', 'C', 'G'].includes(beStatus)) {
         pendingAA.push(project);
       }
       
       // Pending TS - Column AC = "Not Started" AND Column M (TS Status) = D/C/G
-      const acStatus = project['Column AC']?.trim().toLowerCase() || '';
       if (acStatus === 'not started' && ['D', 'C', 'G'].includes(tsStatus)) {
         pendingTS.push(project);
       }
@@ -464,21 +477,20 @@ function App() {
         pendingDTP.push(project);
       }
       
-      // Tender Level - has DTP, in tender process but no TA
-      if (dtpDate && proposalStatus !== 'TA' && !woDate) {
-        // Check if in tender stage (has closing date or is pending for online)
-        if (closingDate || ['D', 'C', 'G'].includes(proposalStatus)) {
-          tenderLevel.push(project);
-        }
+      // Tender Level - Column P = "DTP" AND Column W = "D"
+      // Only count works where S,T,U,V status determines tender stage
+      if (dtpStatus === 'DTP' && proposalStatus === 'D') {
+        tenderLevel.push(project);
       }
       
-      // Tender Approvals - waiting for TA at D/C/G
-      if (['D', 'C', 'G'].includes(proposalStatus) && agencyName) {
+      // Tender Approvals - Column P = "DTP" AND Column W = D/C/G AND S,T,U,V not blank
+      if (dtpStatus === 'DTP' && ['D', 'C', 'G'].includes(proposalStatus) && 
+          (closingDate || openedDate || agencyName || project['% of Tender'])) {
         tenderApprovals.push(project);
       }
       
-      // LOA-WO Level - has TA but no WO
-      if (proposalStatus === 'TA' && !woDate) {
+      // LOA-WO Level - Column AC = "Not Started" AND Column W = "TA"
+      if (acStatus === 'not started' && proposalStatus === 'TA') {
         loaWOLevel.push(project);
       }
       
@@ -553,6 +565,8 @@ function App() {
         status = project['TS Status']?.trim(); // Column M
       } else if (activeFilter === 'pendingDTP') {
         status = project['DTP Status']?.trim(); // Column P
+      } else if (activeFilter === 'tenderApprovals') {
+        status = project['Proposal Status']?.trim(); // Column W
       } else {
         status = project['BE Status']?.trim(); // Column J (default)
       }
@@ -560,6 +574,39 @@ function App() {
       if (status === 'D') breakdown.D++;
       else if (status === 'C') breakdown.C++;
       else if (status === 'G') breakdown.G++;
+    });
+    return breakdown;
+  };
+  
+  // Get tender level breakdown (Ø:Pending, O:Online, E:Evaluation)
+  const getTenderLevelBreakdown = (list) => {
+    const breakdown = { pending: 0, online: 0, evaluation: 0 };
+    list.forEach(project => {
+      const closingDate = parseDate(project['Closing Date']);
+      const openedDate = parseDate(project['Opened Date']);
+      const agencyName = project['Agency Name']?.trim();
+      
+      if (!closingDate && !openedDate && !agencyName) {
+        breakdown.pending++;
+      } else if (closingDate && !openedDate) {
+        breakdown.online++;
+      } else if (closingDate && openedDate) {
+        breakdown.evaluation++;
+      }
+    });
+    return breakdown;
+  };
+  
+  // Get LOA-WO breakdown
+  const getLOAWOBreakdown = (list) => {
+    const breakdown = { loa: 0, wo: 0 };
+    list.forEach(project => {
+      const loaDate = parseDate(project['LOA Date']);
+      if (!loaDate) {
+        breakdown.loa++;
+      } else {
+        breakdown.wo++;
+      }
     });
     return breakdown;
   };
@@ -577,22 +624,48 @@ function App() {
         return dateA - dateB;
       });
       case 'pendingTS': return metrics.pendingTS.sort((a, b) => {
-        const dateA = parseDate(a['AA Date']);
-        const dateB = parseDate(b['AA Date']);
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateA - dateB;
+        // Sort by TS Status: D → C → G
+        const statusOrder = { 'D': 1, 'C': 2, 'G': 3 };
+        const statusA = a['TS Status']?.trim() || '';
+        const statusB = b['TS Status']?.trim() || '';
+        return (statusOrder[statusA] || 9) - (statusOrder[statusB] || 9);
       });
       case 'pendingDTP': return metrics.pendingDTP.sort((a, b) => {
-        const dateA = parseDate(a['TS Date']);
-        const dateB = parseDate(b['TS Date']);
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateA - dateB;
+        // Sort by DTP Status: D → C → G
+        const statusOrder = { 'D': 1, 'C': 2, 'G': 3 };
+        const statusA = a['DTP Status']?.trim() || '';
+        const statusB = b['DTP Status']?.trim() || '';
+        return (statusOrder[statusA] || 9) - (statusOrder[statusB] || 9);
       });
-      case 'tenderLevel': return metrics.tenderLevel;
-      case 'tenderApprovals': return metrics.tenderApprovals;
-      case 'loaWOLevel': return metrics.loaWOLevel;
+      case 'tenderLevel': return metrics.tenderLevel.sort((a, b) => {
+        // Sort: Pending for Online → Tender Online → Tender Under Evaluation
+        const getStage = (project) => {
+          const closingDate = parseDate(project['Closing Date']);
+          const openedDate = parseDate(project['Opened Date']);
+          const agencyName = project['Agency Name']?.trim();
+          
+          if (!closingDate && !openedDate && !agencyName) return 1; // Pending
+          if (closingDate && !openedDate) return 2; // Online
+          if (closingDate && openedDate) return 3; // Evaluation
+          return 4;
+        };
+        return getStage(a) - getStage(b);
+      });
+      case 'tenderApprovals': return metrics.tenderApprovals.sort((a, b) => {
+        // Sort by Proposal Status: D → C → G
+        const statusOrder = { 'D': 1, 'C': 2, 'G': 3 };
+        const statusA = a['Proposal Status']?.trim() || '';
+        const statusB = b['Proposal Status']?.trim() || '';
+        return (statusOrder[statusA] || 9) - (statusOrder[statusB] || 9);
+      });
+      case 'loaWOLevel': return metrics.loaWOLevel.sort((a, b) => {
+        // Sort: LOA Level first → WO Level
+        const loaDateA = parseDate(a['LOA Date']);
+        const loaDateB = parseDate(b['LOA Date']);
+        if (!loaDateA && loaDateB) return -1; // A is LOA, B is WO
+        if (loaDateA && !loaDateB) return 1;  // A is WO, B is LOA
+        return 0;
+      });
       case 'executionPhase': return metrics.executionPhase;
       case 'highPriority': return metrics.highPriority;
       default: return [];
@@ -978,6 +1051,7 @@ function App() {
                       {activeFilter === 'executionPhase' && '🚧 Execution Phase'}
                       {activeFilter === 'highPriority' && '🎯 High Priority Routes'}
                     </CardTitle>
+                    {/* D/C/G Breakdown for Pending AA, TS, DTP, Tender Approvals */}
                     {(activeFilter === 'pendingAA' || activeFilter === 'pendingTS' || activeFilter === 'pendingDTP' || activeFilter === 'tenderApprovals') && (
                       <div className="flex gap-2">
                         {(() => {
@@ -987,6 +1061,35 @@ function App() {
                               <Badge variant="outline" className="bg-blue-50">D: {breakdown.D}</Badge>
                               <Badge variant="outline" className="bg-green-50">C: {breakdown.C}</Badge>
                               <Badge variant="outline" className="bg-purple-50">G: {breakdown.G}</Badge>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {/* Tender Level Breakdown (Ø:Pending, O:Online, E:Evaluation) */}
+                    {activeFilter === 'tenderLevel' && (
+                      <div className="flex gap-2">
+                        {(() => {
+                          const breakdown = getTenderLevelBreakdown(filteredList);
+                          return (
+                            <>
+                              <Badge variant="outline" className="bg-gray-50">Ø: {breakdown.pending}</Badge>
+                              <Badge variant="outline" className="bg-blue-50">O: {breakdown.online}</Badge>
+                              <Badge variant="outline" className="bg-green-50">E: {breakdown.evaluation}</Badge>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {/* LOA-WO Breakdown */}
+                    {activeFilter === 'loaWOLevel' && (
+                      <div className="flex gap-2">
+                        {(() => {
+                          const breakdown = getLOAWOBreakdown(filteredList);
+                          return (
+                            <>
+                              <Badge variant="outline" className="bg-orange-50">LOA: {breakdown.loa}</Badge>
+                              <Badge variant="outline" className="bg-teal-50">WO: {breakdown.wo}</Badge>
                             </>
                           );
                         })()}
