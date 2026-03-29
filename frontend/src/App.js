@@ -25,21 +25,42 @@ const excelDateToJSDate = (serial) => {
 const parseDate = (dateValue) => {
   if (!dateValue) return null;
   
+  // Convert to string for parsing
+  const dateStr = String(dateValue).trim();
+  
+  // Check for DD.MM.YYYY format (with dots)
+  if (dateStr.includes('.') && dateStr.split('.').length === 3) {
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+      const year = parseInt(parts[2], 10);
+      
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) return date;
+      }
+    }
+  }
+  
   // If it's a number (Excel serial date)
-  if (typeof dateValue === 'number' || !isNaN(parseFloat(dateValue))) {
-    return excelDateToJSDate(parseFloat(dateValue));
+  if (typeof dateValue === 'number' || (!isNaN(parseFloat(dateValue)) && !dateStr.includes('.'))) {
+    const serial = parseFloat(dateValue);
+    if (serial > 1000) { // Only treat as serial if it's a large number
+      return excelDateToJSDate(serial);
+    }
   }
   
   // Try parsing as ISO string
   try {
-    const parsed = parseISO(dateValue);
+    const parsed = parseISO(dateStr);
     if (!isNaN(parsed.getTime())) return parsed;
   } catch (e) {
     // Continue to other methods
   }
   
   // Try parsing as standard date string
-  const date = new Date(dateValue);
+  const date = new Date(dateStr);
   return !isNaN(date.getTime()) ? date : null;
 };
 
