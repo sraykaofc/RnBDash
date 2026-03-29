@@ -3,12 +3,22 @@
 ## Overview
 The Red Alerts system has been significantly enhanced to provide comprehensive tracking of project bottlenecks, delays, and critical deadlines across multiple stages of the project lifecycle.
 
+**IMPORTANT**: All alerts require **Column AC = "Not Started"** to trigger. This ensures alerts focus only on projects that haven't begun execution yet.
+
+**Alert Sorting Priority**: Alerts are automatically sorted by urgency:
+1. Bid Validity Expiring (Priority 1 - Most Urgent)
+2. Stuck at Government (Priority 2)
+3. Tender Opening Missed (Priority 3)
+4. LOA Pending (Priority 4)
+5. WO Pending (Priority 5)
+
 ## Alert Types
 
 ### 1. 🚨 Stuck at Government Alert
 **Purpose**: Track files that have been sent to Government (G) and are pending for more than 15 days.
 
 **Trigger Conditions**:
+- **Column AC = "Not Started"** (Required)
 - **BE Status (Column J)** = 'G' → Checks tracking date in **Column K**
 - **TS Status (Column M)** = 'G' → Checks tracking date in **Column N**
 - **DTP Status (Column P)** = 'G' → Checks tracking date in **Column Q**
@@ -31,6 +41,7 @@ The Red Alerts system has been significantly enhanced to provide comprehensive t
 **Purpose**: Identify tenders where the opening date has been missed.
 
 **Trigger Conditions**:
+- **Column AC = "Not Started"** (Required)
 - **Column P (DTP Status)** = 'DTP'
 - **Column W (Proposal Status)** = 'D'
 - **Column S (Closing Date)** crossed more than 15 days ago
@@ -47,6 +58,7 @@ The Red Alerts system has been significantly enhanced to provide comprehensive t
 **Purpose**: Alert when the 120-day bid validity period is approaching expiration.
 
 **Trigger Conditions**:
+- **Column AC = "Not Started"** (Required)
 - **Column P (DTP Status)** = 'DTP' *(NEW requirement)*
 - **Column S (Closing Date)** exists
 - Days remaining = 120 days - (Today - Closing Date)
@@ -64,6 +76,7 @@ The Red Alerts system has been significantly enhanced to provide comprehensive t
 **Purpose**: Track delays in issuing Letter of Award (LOA) after tender approval.
 
 **Trigger Conditions**:
+- **Column AC = "Not Started"** (Required)
 - **Column Y (Tender App. Date)** exists and crossed more than 15 days
 - **Column Z (LOA Date)** is empty (LOA not yet issued)
 
@@ -79,6 +92,7 @@ The Red Alerts system has been significantly enhanced to provide comprehensive t
 **Purpose**: Track delays in issuing Work Order (WO) after LOA.
 
 **Trigger Conditions**:
+- **Column AC = "Not Started"** (Required)
 - **Column Z (LOA Date)** exists and more than 20 days have passed
 - **Column AA (WO Date)** is empty (WO not yet issued)
 
@@ -163,14 +177,19 @@ Project Execution
 
 ✅ **Implemented and Tested**:
 - All 5 alert types are working
-- Red Alerts count: 262 (significantly increased from 13)
-- LOA Pending alerts verified with multiple projects
+- **Column AC = "Not Started" condition applied to all alerts**
+- **Alert sorting by priority working correctly**
+- Red Alerts count: **56** (filtered for "Not Started" projects only)
+- Bid Validity alerts showing first (Priority 1): 6 days, 11 days, 21 days, 24 days remaining
+- Stuck at Govt alerts showing second (Priority 2): "No Date Found for Tracking" alerts visible
 - Date parsing working correctly for DD.MM.YYYY format
-- "No Date Found" alerts trigger when tracking dates are missing
 
 📊 **Current Alert Distribution** (Based on test data):
-- LOA Pending alerts: Most common (many projects waiting for LOA)
-- Other alert types: Present but distribution depends on actual project data in Google Sheet
+- **Bid Validity Expiring**: Showing first (most urgent)
+- **Stuck at Govt**: Multiple alerts with "No Date Found for Tracking" warnings
+- Other alert types: Distribution depends on actual project data in Google Sheet
+
+**Key Improvement**: Alert count reduced from 262 to 56 after adding Column AC filter, providing more focused and actionable alerts.
 
 ---
 

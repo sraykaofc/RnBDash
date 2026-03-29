@@ -444,6 +444,9 @@ function App() {
       const routeType = project['Route Type']?.toLowerCase() || '';
       const appDate = parseDate(project['App. Date']);
       
+      // Get Column AC status early - needed for all alerts
+      const acStatus = project['Column AC']?.trim().toLowerCase() || '';
+      
       // Get G tracking dates
       const beGDate = parseDate(project['BE G Date']);
       const tsGDate = parseDate(project['TS G Date']);
@@ -451,141 +454,156 @@ function App() {
       const proposalGDate = parseDate(project['Proposal G Date']);
       
       // === RED ALERTS SECTION ===
+      // IMPORTANT: All alerts require Column AC = "Not Started"
       
-      // 1. Stuck at Govt Alert - Check columns J, M, P, W for status 'G'
-      // BE Status = G (Column J), tracking date in Column K
-      if (beStatus === 'G') {
-        if (beGDate) {
-          const daysStuck = differenceInDays(new Date(), beGDate);
-          if (daysStuck > 15) {
+      if (acStatus === 'not started') {
+        // 1. Stuck at Govt Alert - Check columns J, M, P, W for status 'G'
+        // BE Status = G (Column J), tracking date in Column K
+        if (beStatus === 'G') {
+          if (beGDate) {
+            const daysStuck = differenceInDays(new Date(), beGDate);
+            if (daysStuck > 15) {
+              redAlerts.push({ 
+                ...project, 
+                alertType: 'Stuck at Govt - BE',
+                alertPriority: 2,
+                daysStuck,
+                stage: 'BE Status'
+              });
+            }
+          } else {
             redAlerts.push({ 
               ...project, 
-              alertType: 'Stuck at Govt - BE', 
-              daysStuck,
+              alertType: 'Stuck at Govt - BE',
+              alertPriority: 2,
+              noDateFound: true,
               stage: 'BE Status'
             });
           }
-        } else {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'Stuck at Govt - BE', 
-            noDateFound: true,
-            stage: 'BE Status'
-          });
         }
-      }
-      
-      // TS Status = G (Column M), tracking date in Column N
-      if (tsStatus === 'G') {
-        if (tsGDate) {
-          const daysStuck = differenceInDays(new Date(), tsGDate);
-          if (daysStuck > 15) {
+        
+        // TS Status = G (Column M), tracking date in Column N
+        if (tsStatus === 'G') {
+          if (tsGDate) {
+            const daysStuck = differenceInDays(new Date(), tsGDate);
+            if (daysStuck > 15) {
+              redAlerts.push({ 
+                ...project, 
+                alertType: 'Stuck at Govt - TS',
+                alertPriority: 2,
+                daysStuck,
+                stage: 'TS Status'
+              });
+            }
+          } else {
             redAlerts.push({ 
               ...project, 
-              alertType: 'Stuck at Govt - TS', 
-              daysStuck,
+              alertType: 'Stuck at Govt - TS',
+              alertPriority: 2,
+              noDateFound: true,
               stage: 'TS Status'
             });
           }
-        } else {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'Stuck at Govt - TS', 
-            noDateFound: true,
-            stage: 'TS Status'
-          });
         }
-      }
-      
-      // DTP Status = G (Column P), tracking date in Column Q
-      if (dtpStatus === 'G') {
-        if (dtpGDate) {
-          const daysStuck = differenceInDays(new Date(), dtpGDate);
-          if (daysStuck > 15) {
+        
+        // DTP Status = G (Column P), tracking date in Column Q
+        if (dtpStatus === 'G') {
+          if (dtpGDate) {
+            const daysStuck = differenceInDays(new Date(), dtpGDate);
+            if (daysStuck > 15) {
+              redAlerts.push({ 
+                ...project, 
+                alertType: 'Stuck at Govt - DTP',
+                alertPriority: 2,
+                daysStuck,
+                stage: 'DTP Status'
+              });
+            }
+          } else {
             redAlerts.push({ 
               ...project, 
-              alertType: 'Stuck at Govt - DTP', 
-              daysStuck,
+              alertType: 'Stuck at Govt - DTP',
+              alertPriority: 2,
+              noDateFound: true,
               stage: 'DTP Status'
             });
           }
-        } else {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'Stuck at Govt - DTP', 
-            noDateFound: true,
-            stage: 'DTP Status'
-          });
         }
-      }
-      
-      // Proposal Status = G (Column W), tracking date in Column X
-      if (proposalStatus === 'G') {
-        if (proposalGDate) {
-          const daysStuck = differenceInDays(new Date(), proposalGDate);
-          if (daysStuck > 15) {
+        
+        // Proposal Status = G (Column W), tracking date in Column X
+        if (proposalStatus === 'G') {
+          if (proposalGDate) {
+            const daysStuck = differenceInDays(new Date(), proposalGDate);
+            if (daysStuck > 15) {
+              redAlerts.push({ 
+                ...project, 
+                alertType: 'Stuck at Govt - Proposal',
+                alertPriority: 2,
+                daysStuck,
+                stage: 'Proposal Status'
+              });
+            }
+          } else {
             redAlerts.push({ 
               ...project, 
-              alertType: 'Stuck at Govt - Proposal', 
-              daysStuck,
+              alertType: 'Stuck at Govt - Proposal',
+              alertPriority: 2,
+              noDateFound: true,
               stage: 'Proposal Status'
             });
           }
-        } else {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'Stuck at Govt - Proposal', 
-            noDateFound: true,
-            stage: 'Proposal Status'
-          });
         }
-      }
-      
-      // 2. Tender Alert - If P=DTP, W=D, and Closing Date (S) crossed >15 days
-      if (dtpStatus === 'DTP' && proposalStatus === 'D' && closingDate) {
-        const daysMissed = differenceInDays(new Date(), closingDate);
-        if (daysMissed > 15) {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'Tender Opening Missed', 
-            daysMissed
-          });
+        
+        // 2. Tender Alert - If P=DTP, W=D, and Closing Date (S) crossed >15 days
+        if (dtpStatus === 'DTP' && proposalStatus === 'D' && closingDate) {
+          const daysMissed = differenceInDays(new Date(), closingDate);
+          if (daysMissed > 15) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Tender Opening Missed',
+              alertPriority: 3,
+              daysMissed
+            });
+          }
         }
-      }
-      
-      // 3. Bid Validity Alert - Enhanced with P=DTP requirement
-      if (dtpStatus === 'DTP' && closingDate) {
-        const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
-        if (daysRemaining < 30 && daysRemaining > 0) {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'Bid Validity Expiring', 
-            daysRemaining 
-          });
+        
+        // 3. Bid Validity Alert - Enhanced with P=DTP requirement
+        if (dtpStatus === 'DTP' && closingDate) {
+          const daysRemaining = 120 - differenceInDays(new Date(), closingDate);
+          if (daysRemaining < 30 && daysRemaining > 0) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'Bid Validity Expiring',
+              alertPriority: 1,
+              daysRemaining 
+            });
+          }
         }
-      }
-      
-      // 4. LOA Alert - Tender App. Date (Y) crossing 15 days
-      if (appDate && !loaDate) {
-        const daysPending = differenceInDays(new Date(), appDate);
-        if (daysPending > 15) {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'LOA Pending', 
-            daysPending
-          });
+        
+        // 4. LOA Alert - Tender App. Date (Y) crossing 15 days
+        if (appDate && !loaDate) {
+          const daysPending = differenceInDays(new Date(), appDate);
+          if (daysPending > 15) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'LOA Pending',
+              alertPriority: 4,
+              daysPending
+            });
+          }
         }
-      }
-      
-      // 5. WO Alert - LOA Date (Z) crossed 20 days
-      if (loaDate && !woDate) {
-        const daysPending = differenceInDays(new Date(), loaDate);
-        if (daysPending > 20) {
-          redAlerts.push({ 
-            ...project, 
-            alertType: 'WO Pending', 
-            daysPending
-          });
+        
+        // 5. WO Alert - LOA Date (Z) crossed 20 days
+        if (loaDate && !woDate) {
+          const daysPending = differenceInDays(new Date(), loaDate);
+          if (daysPending > 20) {
+            redAlerts.push({ 
+              ...project, 
+              alertType: 'WO Pending',
+              alertPriority: 5,
+              daysPending
+            });
+          }
         }
       }
       
@@ -593,9 +611,6 @@ function App() {
       if (proposalStatus === 'X' || proposalStatus === 'OC') {
         return;
       }
-      
-      // Get Column AC status once
-      const acStatus = project['Column AC']?.trim().toLowerCase() || '';
       
       // Pending AA Works - has PAA but no AA
       if (paaDate && !aaDate && ['D', 'C', 'G'].includes(beStatus)) {
@@ -634,6 +649,32 @@ function App() {
       if (routeType.includes('tourist') || routeType.includes('pravasipath')) {
         highPriority.push(project);
       }
+    });
+    
+    // Sort Red Alerts by priority:
+    // 1. Bid Validity Expiring
+    // 2. Stuck at Govt (BE, TS, DTP, Proposal)
+    // 3. Tender Opening Missed
+    // 4. LOA Pending
+    // 5. WO Pending
+    redAlerts.sort((a, b) => {
+      if (a.alertPriority !== b.alertPriority) {
+        return a.alertPriority - b.alertPriority;
+      }
+      // If same priority, sort by days (descending - most urgent first)
+      if (a.daysRemaining !== undefined && b.daysRemaining !== undefined) {
+        return a.daysRemaining - b.daysRemaining; // Lower remaining days = more urgent
+      }
+      if (a.daysStuck !== undefined && b.daysStuck !== undefined) {
+        return b.daysStuck - a.daysStuck; // Higher stuck days = more urgent
+      }
+      if (a.daysMissed !== undefined && b.daysMissed !== undefined) {
+        return b.daysMissed - a.daysMissed; // Higher missed days = more urgent
+      }
+      if (a.daysPending !== undefined && b.daysPending !== undefined) {
+        return b.daysPending - a.daysPending; // Higher pending days = more urgent
+      }
+      return 0;
     });
     
     return { 
