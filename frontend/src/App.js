@@ -121,13 +121,15 @@ const calculateCurrentStatus = (project) => {
   }
   
   // TS
+  if (tsStatus === 'D') return 'TS at D';
   if (tsStatus === 'C') return 'TS at C';
-  if (tsStatus === 'G') return 'TS at Govt';
+  if (tsStatus === 'G') return 'TS at G';
   
   // BE Status
   if (beStatus === 'D') return 'Block Estimate at D';
   if (beStatus === 'C') return 'Block Estimate at C';
   if (beStatus === 'G') return 'Block Estimate at G';
+  if (beStatus === 'AA') return 'AA Done';
   
   return 'Unknown Status';
 };
@@ -149,8 +151,8 @@ function App() {
   useEffect(() => {
     if (isInitialLoad && projects.length === 0) {
       setIsInitialLoad(false);
-      // Automatically import the predefined sheet
-      handleGoogleSheetImport();
+      // Automatically import the predefined sheet silently
+      handleGoogleSheetImport(true); // Pass true for silent mode
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialLoad, projects.length]);
@@ -174,9 +176,9 @@ function App() {
   };
   
   // Import from Google Sheets
-  const handleGoogleSheetImport = async () => {
+  const handleGoogleSheetImport = async (silent = false) => {
     if (!googleSheetUrl) {
-      toast.error('Please enter a Google Sheet URL');
+      if (!silent) toast.error('Please enter a Google Sheet URL');
       return;
     }
     
@@ -207,14 +209,14 @@ function App() {
       }
       
       if (!spreadsheetId) {
-        toast.error('Invalid Google Sheets URL. Please check the URL and try again.');
+        if (!silent) toast.error('Invalid Google Sheets URL. Please check the URL and try again.');
         return;
       }
       
       // Construct CSV export URL
       const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
       
-      toast.loading('Importing from Google Sheets...');
+      if (!silent) toast.loading('Importing from Google Sheets...');
       
       // Try direct fetch first
       try {
@@ -236,16 +238,22 @@ function App() {
           complete: (results) => {
             if (results.data && results.data.length > 0) {
               processData(results.data);
-              toast.dismiss();
-              toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
+              if (!silent) {
+                toast.dismiss();
+                toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
+              }
             } else {
-              toast.dismiss();
-              toast.error('No data found in the sheet. Please check if the sheet has data.');
+              if (!silent) {
+                toast.dismiss();
+                toast.error('No data found in the sheet. Please check if the sheet has data.');
+              }
             }
           },
           error: (error) => {
-            toast.dismiss();
-            toast.error(`Error parsing CSV: ${error.message}`);
+            if (!silent) {
+              toast.dismiss();
+              toast.error(`Error parsing CSV: ${error.message}`);
+            }
           }
         });
         
@@ -271,33 +279,43 @@ function App() {
             complete: (results) => {
               if (results.data && results.data.length > 0) {
                 processData(results.data);
-                toast.dismiss();
-                toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
+                if (!silent) {
+                  toast.dismiss();
+                  toast.success(`Imported ${results.data.length} projects from Google Sheets!`);
+                }
               } else {
-                toast.dismiss();
-                toast.error('No data found in the sheet.');
+                if (!silent) {
+                  toast.dismiss();
+                  toast.error('No data found in the sheet.');
+                }
               }
             },
             error: (error) => {
-              toast.dismiss();
-              toast.error(`Error parsing CSV: ${error.message}`);
+              if (!silent) {
+                toast.dismiss();
+                toast.error(`Error parsing CSV: ${error.message}`);
+              }
             }
           });
           
         } catch (proxyError) {
           console.error('Proxy fetch also failed:', proxyError);
-          toast.dismiss();
-          toast.error(
-            'Unable to import from Google Sheets. Please ensure the sheet is shared as "Anyone with the link" and try again, or download the CSV and upload it directly.',
-            { duration: 6000 }
-          );
+          if (!silent) {
+            toast.dismiss();
+            toast.error(
+              'Unable to import from Google Sheets. Please ensure the sheet is shared as "Anyone with the link" and try again, or download the CSV and upload it directly.',
+              { duration: 6000 }
+            );
+          }
         }
       }
       
     } catch (error) {
       console.error('Error importing from Google Sheets:', error);
-      toast.dismiss();
-      toast.error('Failed to import. Please check the URL or try downloading the CSV and uploading it.');
+      if (!silent) {
+        toast.dismiss();
+        toast.error('Failed to import. Please check the URL or try downloading the CSV and uploading it.');
+      }
     }
   };
   
@@ -435,15 +453,14 @@ function App() {
         pendingAA.push(project);
       }
       
-      // Pending TS - has AA but TS not approved yet
-      // Only count if TS Status is explicitly D, C, or G
-      if (aaDate && ['D', 'C', 'G'].includes(tsStatus) && !tsDate) {
+      // Pending TS - Column AC = "Not Started" AND Column M (TS Status) = D/C/G
+      const acStatus = project['Column AC']?.trim().toLowerCase() || '';
+      if (acStatus === 'not started' && ['D', 'C', 'G'].includes(tsStatus)) {
         pendingTS.push(project);
       }
       
-      // Pending DTP - has TS but DTP not approved yet
-      // Only count if DTP Status is explicitly D, C, or G
-      if (tsDate && ['D', 'C', 'G'].includes(dtpStatus) && !dtpDate) {
+      // Pending DTP - Column M = "TS" AND Column P (DTP Status) = D/C/G
+      if (tsStatus === 'TS' && ['D', 'C', 'G'].includes(dtpStatus)) {
         pendingDTP.push(project);
       }
       
@@ -525,11 +542,21 @@ function App() {
     return distribution;
   }, [filteredProjects]);
   
-  // Get breakdown by D/C/G
+  // Get breakdown by D/C/G based on filter type
   const getBreakdown = (list) => {
     const breakdown = { D: 0, C: 0, G: 0 };
     list.forEach(project => {
-      const status = project['BE Status']?.trim();
+      let status;
+      
+      // Use different columns based on active filter
+      if (activeFilter === 'pendingTS') {
+        status = project['TS Status']?.trim(); // Column M
+      } else if (activeFilter === 'pendingDTP') {
+        status = project['DTP Status']?.trim(); // Column P
+      } else {
+        status = project['BE Status']?.trim(); // Column J (default)
+      }
+      
       if (status === 'D') breakdown.D++;
       else if (status === 'C') breakdown.C++;
       else if (status === 'G') breakdown.G++;
