@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake, Filter, Columns } from 'lucide-react';
+import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake, Filter, Columns, X } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import './App.css';
 
@@ -1056,7 +1056,7 @@ function App() {
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white py-8 px-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2">Panchayat (R&B) Circle No. 2 Dashboard</h1>
+          <h1 className="text-3xl font-bold mb-2">R&B Circle No. 2 Dashboard</h1>
           <p className="text-indigo-100">Superintending Engineer, Rajkot</p>
           <p className="text-sm text-indigo-200 mt-1">Amreli • Bhavnagar • Junagadh • Botad • Porbandar • Gir Somnath</p>
         </div>
@@ -1274,6 +1274,23 @@ function App() {
             {activeFilter && (
               <Card className="mb-6">
                 <CardHeader>
+                  <div className="flex justify-between items-start mb-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveFilter(null)}
+                      className="flex items-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to Dashboard
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setActiveFilter(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                   <div className="flex justify-between items-center">
                     <CardTitle>
                       {activeFilter === 'redAlerts' && '🚨 Red Alerts'}
