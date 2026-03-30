@@ -1053,6 +1053,61 @@ function App() {
     <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" />
       
+      {/* Red Alerts Full Page View */}
+      {activeFilter === 'redAlerts' ? (
+        <div className="min-h-screen bg-slate-50">
+          <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-6 px-6">
+            <div className="max-w-7xl mx-auto">
+              <Button
+                variant="outline"
+                onClick={() => setActiveFilter(null)}
+                className="mb-4 bg-white text-red-600 hover:bg-red-50 border-white"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <h1 className="text-3xl font-bold mb-2">🚨 Red Alerts</h1>
+              <div className="flex gap-2 flex-wrap mt-3">
+                {(() => {
+                  const breakdown = {
+                    BE: metrics.redAlerts.filter(p => p.alertType === 'Stuck at Govt - BE').length,
+                    TS: metrics.redAlerts.filter(p => p.alertType === 'Stuck at Govt - TS').length,
+                    DTP: metrics.redAlerts.filter(p => p.alertType === 'Stuck at Govt - DTP').length,
+                    Proposal: metrics.redAlerts.filter(p => p.alertType === 'Stuck at Govt - Proposal').length,
+                    Tender: metrics.redAlerts.filter(p => p.alertType === 'Bid Validity Crossed' || p.alertType === 'Bid Validity Expiring' || p.alertType === 'Tender Opening Missed').length,
+                    LOA: metrics.redAlerts.filter(p => p.alertType === 'LOA Pending').length,
+                    WO: metrics.redAlerts.filter(p => p.alertType === 'WO Pending').length
+                  };
+                  return (
+                    <>
+                      <Badge className="bg-red-100 text-red-800 hover:bg-red-100">BE: {breakdown.BE}</Badge>
+                      <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">TS: {breakdown.TS}</Badge>
+                      <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">DTP: {breakdown.DTP}</Badge>
+                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Tender: {breakdown.Tender + breakdown.Proposal}</Badge>
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">LOA: {breakdown.LOA}</Badge>
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">WO: {breakdown.WO}</Badge>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="space-y-3">
+              {metrics.redAlerts.map((project) => (
+                <ProjectRow 
+                  key={project.id} 
+                  project={project} 
+                  onClick={() => setSelectedProject(project)}
+                  showAlert={true}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white py-8 px-6">
         <div className="max-w-7xl mx-auto">
@@ -1270,8 +1325,8 @@ function App() {
               </Card>
             </div>
             
-            {/* Active Filter List */}
-            {activeFilter && (
+            {/* Active Filter List (excluding Red Alerts - that has its own full page) */}
+            {activeFilter && activeFilter !== 'redAlerts' && (
               <Card className="mb-6">
                 <CardHeader>
                   <div className="flex justify-between items-start mb-4">
@@ -1457,6 +1512,8 @@ function App() {
       <div className="bg-slate-100 border-t mt-12 py-4 px-6 text-center text-sm text-slate-600">
         <p>Superintending Engineer, Panchayat (R&B) Circle No. 2, Rajkot</p>
       </div>
+        </>
+      )}
     </div>
   );
 }
