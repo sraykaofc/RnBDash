@@ -870,12 +870,12 @@ function App() {
         <Toaster position="top-right" />
         
         {/* Sticky Header */}
-        <div className="sticky top-0 z-50 bg-gradient-to-r from-cyan-400 to-cyan-600 text-white py-4 px-6 shadow-lg">
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-700 to-slate-900 text-white py-4 px-6 shadow-lg">
           <div className="max-w-7xl mx-auto">
             <Button
               variant="outline"
               onClick={() => setSelectedProject(null)}
-              className="mb-3 bg-white text-cyan-600 hover:bg-cyan-50 border-white"
+              className="mb-3 bg-white text-slate-700 hover:bg-slate-50 border-white"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
