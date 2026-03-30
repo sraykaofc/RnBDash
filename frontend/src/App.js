@@ -677,27 +677,23 @@ function App() {
       'Stopped': 0
     };
     
+    // Use filteredProjects (respects division filter) for chart
     filteredProjects.forEach(project => {
       const status = project['Column AC']?.trim() || '';
-      const statusLower = status.toLowerCase();
       
-      // Check exact matches first, then partial matches
-      if (statusLower === 'completed' || statusLower === 'complete') {
-        distribution['Completed']++;
-      } else if (statusLower === 'phy. completed' || statusLower === 'physically completed' || 
-                 (statusLower.includes('phy') && statusLower.includes('complet'))) {
-        distribution['Phy. Completed']++;
-      } else if (statusLower === 'in progress' || statusLower.includes('progress') || 
-                 statusLower.includes('%') || statusLower.includes('working')) {
-        distribution['In Progress']++;
-      } else if (statusLower === 'stopped' || statusLower === 'stop') {
-        distribution['Stopped']++;
-      } else if (statusLower === 'not started' || statusLower === '' || statusLower === 'pending') {
+      // Match EXACT status values from Column AC only
+      if (status === 'Not Started') {
         distribution['Not Started']++;
-      } else {
-        // Default to In Progress for any other status with content
+      } else if (status === 'In Progress') {
         distribution['In Progress']++;
+      } else if (status === 'Phy. Completed') {
+        distribution['Phy. Completed']++;
+      } else if (status === 'Completed') {
+        distribution['Completed']++;
+      } else if (status === 'Stopped') {
+        distribution['Stopped']++;
       }
+      // Ignore any other values (don't count them)
     });
     
     return distribution;
