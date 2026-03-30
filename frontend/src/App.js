@@ -163,6 +163,41 @@ function App() {
   const [columnFilters, setColumnFilters] = useState({});
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   
+  // Authentication states
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('SRayka');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Check if user is already logged in (from localStorage)
+  useEffect(() => {
+    const authStatus = localStorage.getItem('isAuthenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  // Handle login
+  const handleLogin = (e) => {
+    e.preventDefault();
+    
+    // Check credentials
+    if (username === 'SRayka' && password === '123456') {
+      setIsAuthenticated(true);
+      localStorage.setItem('isAuthenticated', 'true');
+      setLoginError('');
+    } else {
+      setLoginError('Invalid username or password');
+      setPassword('');
+    }
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('isAuthenticated');
+    setPassword('');
+  };
   // Auto-load predefined Google Sheet on initial page load
   useEffect(() => {
     if (isInitialLoad && projects.length === 0) {
@@ -1049,6 +1084,58 @@ function App() {
     <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" />
       
+      {/* Login Screen */}
+      {!isAuthenticated ? (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 flex items-center justify-center px-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="space-y-1">
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
+                  <Building2 className="w-8 h-8 text-white" />
+                </div>
+              </div>
+              <CardTitle className="text-2xl font-bold text-center">R&B Circle No. 2</CardTitle>
+              <p className="text-center text-slate-600">Superintending Engineer, Rajkot</p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Username</label>
+                  <Input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter username"
+                    className="w-full"
+                    autoFocus={false}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Password</label>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="w-full"
+                    autoFocus
+                    required
+                  />
+                </div>
+                {loginError && (
+                  <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md border border-red-200">
+                    {loginError}
+                  </div>
+                )}
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
+                  Login
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <>
       {/* Full Page Views for All Stat Cards */}
       {activeFilter ? (
         <div className="min-h-screen bg-slate-50">
@@ -1473,6 +1560,8 @@ function App() {
         <p>Superintending Engineer, Panchayat (R&B) Circle No. 2, Rajkot</p>
       </div>
         </>
+      )}
+      </>
       )}
     </div>
   );
