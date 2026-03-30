@@ -1049,22 +1049,52 @@ function App() {
     <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" />
       
-      {/* Red Alerts Full Page View */}
-      {activeFilter === 'redAlerts' ? (
+      {/* Full Page Views for All Stat Cards */}
+      {activeFilter ? (
         <div className="min-h-screen bg-slate-50">
-          <div className="sticky top-0 z-50 bg-gradient-to-r from-red-600 to-red-800 text-white py-6 px-6 shadow-lg">
+          {/* Dynamic Header based on filter type */}
+          <div className={`sticky top-0 z-50 text-white py-6 px-6 shadow-lg ${
+            activeFilter === 'redAlerts' ? 'bg-gradient-to-r from-red-600 to-red-800' :
+            activeFilter === 'pendingAA' ? 'bg-gradient-to-r from-purple-600 to-purple-800' :
+            activeFilter === 'pendingTS' ? 'bg-gradient-to-r from-blue-600 to-blue-800' :
+            activeFilter === 'pendingDTP' ? 'bg-gradient-to-r from-cyan-600 to-cyan-800' :
+            activeFilter === 'tenderLevel' ? 'bg-gradient-to-r from-orange-600 to-orange-800' :
+            activeFilter === 'tenderApprovals' ? 'bg-gradient-to-r from-green-600 to-green-800' :
+            activeFilter === 'loaWOLevel' ? 'bg-gradient-to-r from-teal-600 to-teal-800' :
+            'bg-gradient-to-r from-indigo-600 to-indigo-800'
+          }`}>
             <div className="max-w-7xl mx-auto">
               <Button
                 variant="outline"
                 onClick={() => setActiveFilter(null)}
-                className="mb-4 bg-white text-red-600 hover:bg-red-50 border-white"
+                className={`mb-4 bg-white hover:bg-opacity-90 border-white ${
+                  activeFilter === 'redAlerts' ? 'text-red-600' :
+                  activeFilter === 'pendingAA' ? 'text-purple-600' :
+                  activeFilter === 'pendingTS' ? 'text-blue-600' :
+                  activeFilter === 'pendingDTP' ? 'text-cyan-600' :
+                  activeFilter === 'tenderLevel' ? 'text-orange-600' :
+                  activeFilter === 'tenderApprovals' ? 'text-green-600' :
+                  activeFilter === 'loaWOLevel' ? 'text-teal-600' :
+                  'text-indigo-600'
+                }`}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Dashboard
               </Button>
-              <h1 className="text-3xl font-bold mb-2">🚨 Red Alerts</h1>
+              <h1 className="text-3xl font-bold mb-2">
+                {activeFilter === 'redAlerts' && '🚨 Red Alerts'}
+                {activeFilter === 'pendingAA' && '📋 Pending AA Works'}
+                {activeFilter === 'pendingTS' && '🔧 Pending TS Works'}
+                {activeFilter === 'pendingDTP' && '📝 Pending DTP Works'}
+                {activeFilter === 'tenderLevel' && '📢 Tender Level Works'}
+                {activeFilter === 'tenderApprovals' && '✅ Tender Approvals'}
+                {activeFilter === 'loaWOLevel' && '🤝 LOA-WO Level'}
+                {activeFilter === 'highPriority' && '🎯 High Priority Routes'}
+              </h1>
+              
+              {/* Breakdown badges */}
               <div className="flex gap-2 flex-wrap mt-3">
-                {(() => {
+                {activeFilter === 'redAlerts' && (() => {
                   const breakdown = {
                     BE: metrics.redAlerts.filter(p => p.alertType === 'Stuck at Govt - BE').length,
                     TS: metrics.redAlerts.filter(p => p.alertType === 'Stuck at Govt - TS').length,
@@ -1085,20 +1115,73 @@ function App() {
                     </>
                   );
                 })()}
+                
+                {(activeFilter === 'pendingAA' || activeFilter === 'pendingTS' || activeFilter === 'pendingDTP' || activeFilter === 'tenderApprovals') && (() => {
+                  const breakdown = getBreakdown(
+                    activeFilter === 'redAlerts' ? metrics.redAlerts :
+                    activeFilter === 'pendingAA' ? metrics.pendingAA :
+                    activeFilter === 'pendingTS' ? metrics.pendingTS :
+                    activeFilter === 'pendingDTP' ? metrics.pendingDTP :
+                    activeFilter === 'tenderApprovals' ? metrics.tenderApprovals :
+                    []
+                  );
+                  return (
+                    <>
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">D: {breakdown.D}</Badge>
+                      <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">C: {breakdown.C}</Badge>
+                      <Badge className="bg-red-100 text-red-800 hover:bg-red-100">G: {breakdown.G}</Badge>
+                    </>
+                  );
+                })()}
+                
+                {activeFilter === 'tenderLevel' && (() => {
+                  const breakdown = getTenderLevelBreakdown(metrics.tenderLevel);
+                  return (
+                    <>
+                      <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">Ø: {breakdown.pending}</Badge>
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">O: {breakdown.online}</Badge>
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">E: {breakdown.evaluation}</Badge>
+                    </>
+                  );
+                })()}
+                
+                {activeFilter === 'loaWOLevel' && (() => {
+                  const breakdown = getLOAWOBreakdown(metrics.loaWOLevel);
+                  return (
+                    <>
+                      <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">LOA: {breakdown.loa}</Badge>
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">WO: {breakdown.wo}</Badge>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
           
+          {/* Content Section */}
           <div className="max-w-7xl mx-auto px-6 py-6">
             <div className="space-y-3">
-              {metrics.redAlerts.map((project) => (
-                <ProjectRow 
-                  key={project.id} 
-                  project={project} 
-                  onClick={() => setSelectedProject(project)}
-                  showAlert={true}
-                />
-              ))}
+              {(() => {
+                const list = 
+                  activeFilter === 'redAlerts' ? metrics.redAlerts :
+                  activeFilter === 'pendingAA' ? metrics.pendingAA :
+                  activeFilter === 'pendingTS' ? metrics.pendingTS :
+                  activeFilter === 'pendingDTP' ? metrics.pendingDTP :
+                  activeFilter === 'tenderLevel' ? metrics.tenderLevel :
+                  activeFilter === 'tenderApprovals' ? metrics.tenderApprovals :
+                  activeFilter === 'loaWOLevel' ? metrics.loaWOLevel :
+                  activeFilter === 'highPriority' ? metrics.highPriority :
+                  [];
+                  
+                return list.map((project) => (
+                  <ProjectRow 
+                    key={project.id} 
+                    project={project} 
+                    onClick={() => setSelectedProject(project)}
+                    showAlert={activeFilter === 'redAlerts'}
+                  />
+                ));
+              })()}
             </div>
           </div>
         </div>
@@ -1320,125 +1403,6 @@ function App() {
                 </CardContent>
               </Card>
             </div>
-            
-            {/* Active Filter List (excluding Red Alerts - that has its own full page) */}
-            {activeFilter && activeFilter !== 'redAlerts' && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <div className="flex justify-between items-start mb-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveFilter(null)}
-                      className="flex items-center gap-2"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Back to Dashboard
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setActiveFilter(null)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>
-                      {activeFilter === 'redAlerts' && '🚨 Red Alerts'}
-                      {activeFilter === 'pendingAA' && '📋 Pending AA Works'}
-                      {activeFilter === 'pendingTS' && '🔧 Pending TS Works'}
-                      {activeFilter === 'pendingDTP' && '📝 Pending DTP Works'}
-                      {activeFilter === 'tenderLevel' && '📢 Tender Level Works'}
-                      {activeFilter === 'tenderApprovals' && '✅ Tender Approvals'}
-                      {activeFilter === 'loaWOLevel' && '🤝 LOA-WO Level'}
-                      {activeFilter === 'highPriority' && '🎯 High Priority Routes'}
-                    </CardTitle>
-                    {/* Red Alerts Breakdown (BE, TS, DTP, Tender, LOA, WO) */}
-                    {activeFilter === 'redAlerts' && (
-                      <div className="flex gap-2 flex-wrap">
-                        {(() => {
-                          const breakdown = {
-                            BE: filteredList.filter(p => p.alertType === 'Stuck at Govt - BE').length,
-                            TS: filteredList.filter(p => p.alertType === 'Stuck at Govt - TS').length,
-                            DTP: filteredList.filter(p => p.alertType === 'Stuck at Govt - DTP').length,
-                            Proposal: filteredList.filter(p => p.alertType === 'Stuck at Govt - Proposal').length,
-                            Tender: filteredList.filter(p => p.alertType === 'Bid Validity Crossed' || p.alertType === 'Bid Validity Expiring' || p.alertType === 'Tender Opening Missed').length,
-                            LOA: filteredList.filter(p => p.alertType === 'LOA Pending').length,
-                            WO: filteredList.filter(p => p.alertType === 'WO Pending').length
-                          };
-                          return (
-                            <>
-                              <Badge variant="outline" className="bg-red-50">BE: {breakdown.BE}</Badge>
-                              <Badge variant="outline" className="bg-orange-50">TS: {breakdown.TS}</Badge>
-                              <Badge variant="outline" className="bg-yellow-50">DTP: {breakdown.DTP}</Badge>
-                              <Badge variant="outline" className="bg-purple-50">Tender: {breakdown.Tender + breakdown.Proposal}</Badge>
-                              <Badge variant="outline" className="bg-blue-50">LOA: {breakdown.LOA}</Badge>
-                              <Badge variant="outline" className="bg-green-50">WO: {breakdown.WO}</Badge>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {/* D/C/G Breakdown for Pending AA, TS, DTP, Tender Approvals */}
-                    {(activeFilter === 'pendingAA' || activeFilter === 'pendingTS' || activeFilter === 'pendingDTP' || activeFilter === 'tenderApprovals') && (
-                      <div className="flex gap-2">
-                        {(() => {
-                          const breakdown = getBreakdown(filteredList);
-                          return (
-                            <>
-                              <Badge variant="outline" className="bg-blue-50">D: {breakdown.D}</Badge>
-                              <Badge variant="outline" className="bg-green-50">C: {breakdown.C}</Badge>
-                              <Badge variant="outline" className="bg-purple-50">G: {breakdown.G}</Badge>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {/* Tender Level Breakdown (Ø:Pending, O:Online, E:Evaluation) */}
-                    {activeFilter === 'tenderLevel' && (
-                      <div className="flex gap-2">
-                        {(() => {
-                          const breakdown = getTenderLevelBreakdown(filteredList);
-                          return (
-                            <>
-                              <Badge variant="outline" className="bg-gray-50">Ø: {breakdown.pending}</Badge>
-                              <Badge variant="outline" className="bg-blue-50">O: {breakdown.online}</Badge>
-                              <Badge variant="outline" className="bg-green-50">E: {breakdown.evaluation}</Badge>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {/* LOA-WO Breakdown */}
-                    {activeFilter === 'loaWOLevel' && (
-                      <div className="flex gap-2">
-                        {(() => {
-                          const breakdown = getLOAWOBreakdown(filteredList);
-                          return (
-                            <>
-                              <Badge variant="outline" className="bg-orange-50">LOA: {breakdown.loa}</Badge>
-                              <Badge variant="outline" className="bg-teal-50">WO: {breakdown.wo}</Badge>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                    {filteredList.map((project) => (
-                      <ProjectRow 
-                        key={project.id} 
-                        project={project} 
-                        onClick={() => setSelectedProject(project)}
-                        showAlert={activeFilter === 'redAlerts'}
-                      />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
             
             {/* Quick Actions */}
             <div className="flex gap-4 mb-6">
