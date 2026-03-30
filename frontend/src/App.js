@@ -1,154 +1,21 @@
 import { useState, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
-import { format, differenceInDays, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { AlertTriangle, FileText, Clock, Building2, TrendingUp, Upload, Link2, ArrowLeft, ChevronRight, FileCheck, FilePlus, Gavel, Clipboard, Handshake, Filter, Columns, X } from 'lucide-react';
+import { AlertTriangle, FileText, Clock, TrendingUp, Upload, Link2, ArrowLeft, FileCheck, FilePlus, Gavel, Clipboard, Handshake } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
+import { parseDate, formatDate, calculateCurrentStatus, differenceInDays } from './utils/helpers';
+import { PREDEFINED_SHEET_URL } from './utils/constants';
+import { Login } from './components/dashboard/Login';
+import { ProjectDetails } from './components/dashboard/ProjectDetails';
+import { DataTable } from './components/dashboard/DataTable';
+import { ProjectRow } from './components/dashboard/ProjectRow';
 import './App.css';
-
-// Utility to convert Excel serial date to JavaScript Date
-const excelDateToJSDate = (serial) => {
-  if (!serial || isNaN(serial)) return null;
-  const utc_days = Math.floor(serial - 25569);
-  const utc_value = utc_days * 86400;
-  const date_info = new Date(utc_value * 1000);
-  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate());
-};
-
-// Parse date from various formats
-const parseDate = (dateValue) => {
-  if (!dateValue) return null;
-  
-  // Convert to string for parsing
-  const dateStr = String(dateValue).trim();
-  
-  // Check for DD.MM.YYYY format (with dots)
-  if (dateStr.includes('.') && dateStr.split('.').length === 3) {
-    const parts = dateStr.split('.');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
-      const year = parseInt(parts[2], 10);
-      
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        const date = new Date(year, month, day);
-        if (!isNaN(date.getTime())) return date;
-      }
-    }
-  }
-  
-  // If it's a number (Excel serial date)
-  if (typeof dateValue === 'number' || (!isNaN(parseFloat(dateValue)) && !dateStr.includes('.'))) {
-    const serial = parseFloat(dateValue);
-    if (serial > 1000) { // Only treat as serial if it's a large number
-      return excelDateToJSDate(serial);
-    }
-  }
-  
-  // Try parsing as ISO string
-  try {
-    const parsed = parseISO(dateStr);
-    if (!isNaN(parsed.getTime())) return parsed;
-  } catch (e) {
-    // Continue to other methods
-  }
-  
-  // Try parsing as standard date string
-  const date = new Date(dateStr);
-  return !isNaN(date.getTime()) ? date : null;
-};
-
-// Format date for display
-const formatDate = (date) => {
-  if (!date) return 'N/A';
-  try {
-    return format(date, 'dd.MM.yyyy');
-  } catch {
-    return 'Invalid Date';
-  }
-};
-
-// Calculate current status based on hierarchy
-const calculateCurrentStatus = (project) => {
-  const proposalStatus = project['Proposal Status']?.trim();
-  const loaDate = parseDate(project['LOA Date']);
-  const woDate = parseDate(project['WO Date']);
-  const acValue = project['Column AC']?.trim();
-  const dtpStatus = project['DTP Status']?.trim();
-  const tsStatus = project['TS Status']?.trim();
-  const beStatus = project['BE Status']?.trim();
-  const closingDate = parseDate(project['Closing Date']);
-  const openedDate = parseDate(project['Opened Date']);
-  const agencyName = project['Agency Name']?.trim();
-  
-  // LOA-WO Level (for TA with AC = Not Started)
-  if (proposalStatus === 'TA') {
-    const acLower = acValue?.toLowerCase() || '';
-    if (acLower === 'not started') {
-      if (!loaDate) return 'LOA Level';
-      if (loaDate && !woDate) return 'WO Level';
-    }
-    // Regular TA handling
-    if (woDate && loaDate) {
-      return acValue || 'In Progress';
-    } else if (loaDate) {
-      return 'LOA Level';
-    } else {
-      return 'WO Level';
-    }
-  }
-  
-  // Tender Level & Tender Approvals (P=DTP, W=D/C/G)
-  if (dtpStatus === 'DTP' && proposalStatus === 'D') {
-    // Tender Level - determine stage
-    if (!closingDate && !openedDate && !agencyName) {
-      return 'Pending for Online';
-    } else if (closingDate && !openedDate) {
-      return 'Tender Online';
-    } else if (closingDate && openedDate && !agencyName) {
-      return 'Tender Under Evaluation';
-    }
-  }
-  
-  // Tender Approvals - has agency, waiting for approval
-  if (dtpStatus === 'DTP' && ['D', 'C', 'G'].includes(proposalStatus) && 
-      (closingDate || openedDate || agencyName)) {
-    if (proposalStatus === 'D') return 'Proposal at D';
-    if (proposalStatus === 'C') return 'Proposal at C';
-    if (proposalStatus === 'G') return 'Proposal at G';
-  }
-  
-  // DTP
-  if (tsStatus === 'TS' || ['D', 'C', 'G'].includes(dtpStatus)) {
-    if (dtpStatus === 'D') return 'DTP at D';
-    if (dtpStatus === 'C') return 'DTP at C';
-    if (dtpStatus === 'G') return 'DTP at G';
-  }
-  
-  // TS
-  if (tsStatus === 'D') return 'TS at D';
-  if (tsStatus === 'C') return 'TS at C';
-  if (tsStatus === 'G') return 'TS at G';
-  
-  // BE Status
-  if (beStatus === 'D') return 'Block Estimate at D';
-  if (beStatus === 'C') return 'Block Estimate at C';
-  if (beStatus === 'G') return 'Block Estimate at G';
-  if (beStatus === 'AA') return 'AA Done';
-  
-  return 'Unknown Status';
-};
-
-// Predefined Google Sheet URL
-const PREDEFINED_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1fvb5M7f-rajXCgPF7ntDiQaeD6mJwq_5jdo6TL_NsKQ/edit?gid=0#gid=0';
 
 function App() {
   const [projects, setProjects] = useState([]);
@@ -159,15 +26,9 @@ function App() {
   const [showDataTable, setShowDataTable] = useState(false);
   const [selectedDivisions, setSelectedDivisions] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [visibleColumns, setVisibleColumns] = useState(['Code', 'Work Name', 'Division', 'PAA Amount', 'PAA Date', 'Status']);
-  const [columnFilters, setColumnFilters] = useState({});
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
   
-  // Authentication states
+  // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('SRayka');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
 
   // Check if user is already logged in (from localStorage)
   useEffect(() => {
@@ -177,26 +38,10 @@ function App() {
     }
   }, []);
 
-  // Handle login
-  const handleLogin = (e) => {
-    e.preventDefault();
-    
-    // Check credentials
-    if (username === 'SRayka' && password === '123456') {
-      setIsAuthenticated(true);
-      localStorage.setItem('isAuthenticated', 'true');
-      setLoginError('');
-    } else {
-      setLoginError('Invalid username or password');
-      setPassword('');
-    }
-  };
-
   // Handle logout
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('isAuthenticated');
-    setPassword('');
   };
   // Auto-load predefined Google Sheet on initial page load
   useEffect(() => {
@@ -866,228 +711,23 @@ function App() {
   // Render project details
   if (selectedProject) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <Toaster position="top-right" />
-        
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-700 to-slate-900 text-white py-4 px-6 shadow-lg">
-          <div className="max-w-7xl mx-auto">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedProject(null)}
-              className="mb-3 bg-white text-slate-700 hover:bg-slate-50 border-white"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <h1 className="text-2xl font-bold">{selectedProject['Work Name']}</h1>
-            <div className="flex gap-2 items-center text-sm text-white mt-2 flex-wrap">
-              <span>{selectedProject['Division']}</span>
-              <span>•</span>
-              <span>{calculateCurrentStatus(selectedProject)}</span>
-              {selectedProject['PAA Amount'] && (
-                <>
-                  <span>•</span>
-                  <span>PAA: {selectedProject['PAA Amount']}</span>
-                </>
-              )}
-              {selectedProject['PAA Date'] && (
-                <>
-                  <span>•</span>
-                  <span>PAA Dt: {formatDate(parseDate(selectedProject['PAA Date']))}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Content */}
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Project Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(selectedProject).map(([key, value]) => {
-                  if (key === 'id') return null;
-                  return (
-                    <div key={key} className="border-b pb-2">
-                      <div className="text-xs font-medium text-slate-500">{key}</div>
-                      <div className="text-sm mt-1">{value || 'N/A'}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <ProjectDetails 
+        project={selectedProject} 
+        onBack={() => setSelectedProject(null)} 
+      />
     );
   }
   
   // Render full data table view
   if (showDataTable) {
-    // Available columns for selection - ALL columns from the data
-    const allColumns = [
-      { key: 'Code', label: 'Code' },
-      { key: 'Work Name', label: 'Work Name' },
-      { key: 'Division', label: 'Division' },
-      { key: 'PAA Amount', label: 'PAA Amount' },
-      { key: 'PAA Date', label: 'PAA Date' },
-      { key: 'Status', label: 'Status (Column AC)' },
-      { key: 'BE Status', label: 'BE Status' },
-      { key: 'AA Amount', label: 'AA Amount' },
-      { key: 'AA Date', label: 'AA Date' },
-      { key: 'TS Status', label: 'TS Status' },
-      { key: 'TS Amount', label: 'TS Amount' },
-      { key: 'TS Date', label: 'TS Date' },
-      { key: 'DTP Status', label: 'DTP Status' },
-      { key: 'DTP Amount', label: 'DTP Amount' },
-      { key: 'DTP Date', label: 'DTP Date' },
-      { key: 'Closing Date', label: 'Closing Date' },
-      { key: 'Opened Date', label: 'Opened Date' },
-      { key: 'Agency Name', label: 'Agency Name' },
-      { key: '% of Tender', label: '% of Tender' },
-      { key: 'Proposal Status', label: 'Proposal Status' },
-      { key: 'Approved Amount', label: 'Approved Amount' },
-      { key: 'App. Date', label: 'App. Date' },
-      { key: 'LOA Date', label: 'LOA Date' },
-      { key: 'WO Date', label: 'WO Date' },
-      { key: 'Year', label: 'Year' },
-      { key: 'Time', label: 'Time' },
-      { key: 'Amount Category', label: 'Amount Category' },
-      { key: 'Year YYYY', label: 'Year YYYY' },
-      { key: 'Route Type', label: 'Route Type' }
-    ];
-    
-    // Apply column filters
-    const filteredByColumns = searchedProjects.filter(project => {
-      return Object.entries(columnFilters).every(([column, filterValue]) => {
-        if (!filterValue) return true;
-        const projectValue = String(project[column] || '').toLowerCase();
-        return projectValue.includes(filterValue.toLowerCase());
-      });
-    });
-    
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
-        <Toaster position="top-right" />
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-4 gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowDataTable(false)}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            
-            <div className="flex gap-2 flex-1 max-w-2xl">
-              <Input
-                placeholder="Search all data..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-              />
-              
-              <Popover open={showColumnSelector} onOpenChange={setShowColumnSelector}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline">
-                    <Columns className="w-4 h-4 mr-2" />
-                    Columns
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56">
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm mb-2">Show Columns</h4>
-                    {allColumns.map(col => (
-                      <div key={col.key} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={col.key}
-                          checked={visibleColumns.includes(col.key)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setVisibleColumns([...visibleColumns, col.key]);
-                            } else {
-                              setVisibleColumns(visibleColumns.filter(c => c !== col.key));
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={col.key}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {col.label}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-100 border-b">
-                    <tr>
-                      {allColumns.map(col => {
-                        if (!visibleColumns.includes(col.key)) return null;
-                        return (
-                          <th key={col.key} className="px-4 py-3 text-left">
-                            <div className="space-y-1">
-                              <div className="font-medium">{col.label}</div>
-                              <Input
-                                placeholder="Filter..."
-                                value={columnFilters[col.key] || ''}
-                                onChange={(e) => setColumnFilters({...columnFilters, [col.key]: e.target.value})}
-                                className="h-7 text-xs"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredByColumns.map((project) => (
-                      <tr 
-                        key={project.id} 
-                        className="border-b hover:bg-slate-50 cursor-pointer"
-                        onClick={() => setSelectedProject(project)}
-                      >
-                        {allColumns.map(col => {
-                          if (!visibleColumns.includes(col.key)) return null;
-                          
-                          // Special handling for date columns
-                          const dateColumns = ['PAA Date', 'AA Date', 'TS Date', 'DTP Date', 'Closing Date', 'Opened Date', 'App. Date', 'LOA Date', 'WO Date'];
-                          const isDateColumn = dateColumns.includes(col.key);
-                          
-                          // Special handling for Status column (maps to Column AC)
-                          let value = project[col.key];
-                          if (col.key === 'Status') {
-                            value = project['Column AC'];
-                          }
-                          
-                          return (
-                            <td key={col.key} className="px-4 py-3">
-                              {isDateColumn ? formatDate(parseDate(value)) : (value || 'N/A')}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <DataTable 
+        projects={searchedProjects}
+        onBack={() => setShowDataTable(false)}
+        onProjectClick={(project) => setSelectedProject(project)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
     );
   }
   
@@ -1097,54 +737,7 @@ function App() {
       
       {/* Login Screen */}
       {!isAuthenticated ? (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 flex items-center justify-center px-4">
-          <Card className="w-full max-w-md">
-            <CardHeader className="space-y-1">
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
-                  <Building2 className="w-8 h-8 text-white" />
-                </div>
-              </div>
-              <CardTitle className="text-2xl font-bold text-center">R&B Circle No. 2</CardTitle>
-              <p className="text-center text-slate-600">Superintending Engineer, Rajkot</p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Username</label>
-                  <Input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter username"
-                    className="w-full"
-                    autoFocus={false}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Password</label>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full"
-                    autoFocus
-                    required
-                  />
-                </div>
-                {loginError && (
-                  <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md border border-red-200">
-                    {loginError}
-                  </div>
-                )}
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
-                  Login
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+        <Login onLoginSuccess={() => setIsAuthenticated(true)} />
       ) : (
         <>
       {/* Full Page Views for All Stat Cards */}
@@ -1574,106 +1167,6 @@ function App() {
       )}
       </>
       )}
-    </div>
-  );
-}
-
-// Project Row Component
-function ProjectRow({ project, onClick, showAlert }) {
-  const paaAmount = project['PAA Amount'];
-  const paaDate = parseDate(project['PAA Date']);
-  const division = project['Division'];
-  const currentStatus = calculateCurrentStatus(project);
-  const beStatus = project['BE Status']?.trim();
-  
-  return (
-    <div 
-      onClick={onClick}
-      className="p-4 bg-white border rounded-lg hover:shadow-md transition-all cursor-pointer"
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <h3 className="font-medium text-slate-900">{project['Work Name']}</h3>
-        </div>
-      </div>
-      
-      {(paaAmount || paaDate) && (
-        <div className="text-xs font-bold text-slate-500 mb-1">
-          PAA: {paaAmount || 'N/A'} Dt: {formatDate(paaDate)}
-        </div>
-      )}
-      
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <span>{division}</span>
-        <span>•</span>
-        <span>{currentStatus}</span>
-      </div>
-      
-      <div className="flex items-center gap-2 mt-2 flex-wrap">
-        {beStatus && (
-          <Badge variant="outline" className="text-xs">
-            {beStatus === 'D' && 'Division'}
-            {beStatus === 'C' && 'Circle'}
-            {beStatus === 'G' && 'Government'}
-            {beStatus === 'AA' && 'AA Done'}
-          </Badge>
-        )}
-        
-        {/* Bid Validity Crossed Alert (Expired) */}
-        {showAlert && project.alertType === 'Bid Validity Crossed' && (
-          <Badge variant="destructive" className="text-xs font-bold">
-            🚨 Bid Validity Crossed by {project.daysCrossed} days
-          </Badge>
-        )}
-        
-        {/* Bid Validity Expiring Alert */}
-        {showAlert && project.alertType === 'Bid Validity Expiring' && (
-          <Badge variant="destructive" className="text-xs">
-            ⏰ Bid Validity: {project.daysRemaining} days left
-          </Badge>
-        )}
-        
-        {/* Stuck at Govt Alerts */}
-        {showAlert && project.alertType?.includes('Stuck at Govt') && (
-          <Badge variant="destructive" className="text-xs">
-            {project.noDateFound 
-              ? `⚠️ ${project.stage}: No Date Found for Tracking`
-              : `🚨 ${project.stage}: Stuck for ${project.daysStuck} days`
-            }
-          </Badge>
-        )}
-        
-        {/* Tender Opening Missed Alert */}
-        {showAlert && project.alertType === 'Tender Opening Missed' && (
-          <Badge variant="destructive" className="text-xs">
-            📢 Tender Opening Missed by {project.daysMissed} days
-          </Badge>
-        )}
-        
-        {/* LOA Pending Alert */}
-        {showAlert && project.alertType === 'LOA Pending' && (
-          <Badge variant="destructive" className="text-xs">
-            📋 LOA Pending for {project.daysPending} days
-          </Badge>
-        )}
-        
-        {/* WO Pending Alert */}
-        {showAlert && project.alertType === 'WO Pending' && (
-          <Badge variant="destructive" className="text-xs">
-            📝 WO Pending for {project.daysPending} days
-          </Badge>
-        )}
-        
-        {project['Route Type']?.toLowerCase().includes('tourist') && (
-          <Badge className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">Tourist Route</Badge>
-        )}
-        
-        {project['Route Type']?.toLowerCase().includes('pravasipath') && (
-          <Badge className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">Pravasipath</Badge>
-        )}
-        
-        <ChevronRight className="w-4 h-4 ml-auto text-slate-400" />
-      </div>
     </div>
   );
 }
