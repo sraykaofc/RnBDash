@@ -866,26 +866,40 @@ function App() {
   // Render project details
   if (selectedProject) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
+      <div className="min-h-screen bg-slate-50">
         <Toaster position="top-right" />
-        <div className="max-w-7xl mx-auto">
-          <Button
-            variant="outline"
-            onClick={() => setSelectedProject(null)}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          
+        
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-700 to-slate-900 text-white py-4 px-6 shadow-lg">
+          <div className="max-w-7xl mx-auto">
+            <Button
+              variant="outline"
+              onClick={() => setSelectedProject(null)}
+              className="mb-3 bg-white text-slate-700 hover:bg-slate-50 border-white"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <h1 className="text-2xl font-bold">{selectedProject['Work Name']}</h1>
+            <div className="flex gap-2 items-center text-sm text-slate-200 mt-2">
+              <span>{selectedProject['Division']}</span>
+              <span>•</span>
+              <span>{calculateCurrentStatus(selectedProject)}</span>
+              {selectedProject['PAA Amount'] && (
+                <>
+                  <span>•</span>
+                  <span>PAA: {selectedProject['PAA Amount']}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="max-w-7xl mx-auto px-6 py-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">{selectedProject['Work Name']}</CardTitle>
-              <div className="flex gap-2 items-center text-sm text-slate-600 mt-2">
-                <span>{selectedProject['Division']}</span>
-                <span>•</span>
-                <span>{calculateCurrentStatus(selectedProject)}</span>
-              </div>
+              <CardTitle className="text-xl">Project Details</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -901,15 +915,6 @@ function App() {
               </div>
             </CardContent>
           </Card>
-          
-          <Button
-            variant="outline"
-            onClick={() => setSelectedProject(null)}
-            className="mt-4 w-full"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
         </div>
       </div>
     );
