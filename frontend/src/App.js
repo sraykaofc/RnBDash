@@ -1056,7 +1056,7 @@ function App() {
       {/* Red Alerts Full Page View */}
       {activeFilter === 'redAlerts' ? (
         <div className="min-h-screen bg-slate-50">
-          <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-6 px-6">
+          <div className="sticky top-0 z-50 bg-gradient-to-r from-red-600 to-red-800 text-white py-6 px-6 shadow-lg">
             <div className="max-w-7xl mx-auto">
               <Button
                 variant="outline"
